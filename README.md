@@ -65,7 +65,7 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 ```bash
 .
 ├── index.html              # Main app
-├── index-standalone.html   # Bundled offline version
+├── index-standalone.html   # Bundled Online and StandAlone version
 ├── libs/                   # Libraries (Plotly.js, PapaParse, etc.)
 ├── LICENSE                 # MIT License
 ├── README.md               # This file
