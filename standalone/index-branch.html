@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>かんたんグラフ作成アプリ (HTML+Plotly)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        /* カスタムスタイル: サイドバーの幅とメインコンテンツの調整 */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+        }
+        .main-content {
+            flex-grow: 1;
+        }
+        /* Plotlyの描画領域の高さ設定 */
+        #chart-container {
+            min-height: 600px;
+        }
+        /* スクロールバーのスタイルを調整して見やすく */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
+        ::-webkit-scrollbar-track {
+            background-color: #f1f5f9;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex flex-col min-h-screen">
+    <!-- FIX: alert()の代わりにメッセージ表示用のコンテナを追加 -->
+    <div id="message-container" class="fixed top-0 left-1/2 -translate-x-1/2 z-50 p-4 w-full max-w-md"></div>
+    
+    <header class="bg-white shadow-md p-4 flex items-center justify-between z-10">
+        <h1 class="text-xl font-bold text-gray-800">📊 かんたんグラフ作成アプリ</h1>
+        <div class="flex items-center space-x-2">
+            <!-- ボタンの修正は不要。onClickはdownloadChartAsImage()を呼び出している。 -->
+            <button id="downloadChartBtn" onclick="downloadChartAsImage()" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-lg disabled:opacity-50" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                <span>画像ダウンロード</span>
+            </button>
+            <button id="createChartBtn" class="flex items-center bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h11.25a2.25 2.25 0 0 1 2.25 2.25v2.25m-10.5 7.5a1.5 1.5 0 0 1-3 0v-3a1.5 1.5 0 0 1 3 0m7.5 0a1.5 1.5 0 0 1-3 0v-3a1.5 1.5 0 0 1 3 0m7.5 0a1.5 1.5 0 0 1-3 0v-3a1.5 1.5 0 0 1 3 0" />
+                </svg>
+                <span>グラフを作成</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow flex">
+        <!-- サイドバー (データ入力と設定) -->
+        <aside class="sidebar bg-white p-6 shadow-xl overflow-y-auto flex flex-col space-y-6">
+            <h2 class="text-lg font-semibold text-gray-700 border-b pb-2">データと設定</h2>
+
+            <!-- ファイル入力 -->
+            <section>
+                <label for="fileInput" class="block text-sm font-medium text-gray-700 mb-2">① データファイル (.xlsx, .csv) を選択</label>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+            </section>
+
+            <!-- グラフタイプ選択 -->
+            <section>
+                <label for="chartType" class="block text-sm font-medium text-gray-700 mb-2">② グラフタイプ</label>
+                <select id="chartType" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                    <option value="">-- グラフを選択 --</option>
+                    <option value="line">折れ線グラフ (Line)</option>
+                    <option value="bar">棒グラフ (Bar)</option>
+                    <option value="scatter">散布図 (Scatter)</option>
+                    <option value="histogram">ヒストグラム (Histogram)</option>
+                    <option value="xbar">X-bar 管理図</option>
+                    <option value="rs">移動範囲 R_s 管理図</option>
+                </select>
+            </section>
+
+            <!-- X軸選択 -->
+            <section>
+                <label for="xAxis" class="block text-sm font-medium text-gray-700 mb-2">③ X軸 (カテゴリ/時系列)</label>
+                <select id="xAxis" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm" disabled>
+                    <option value="">-- 列を選択 --</option>
+                </select>
+            </section>
+
+            <!-- Y軸選択 -->
+            <section>
+                <label for="yAxis" class="block text-sm font-medium text-gray-700 mb-2">④ Y軸 (数値)</label>
+                <select id="yAxis" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm" disabled>
+                    <option value="">-- 列を選択 --</option>
+                </select>
+                <p id="yAxisHint" class="text-xs text-gray-500 mt-1 hidden">※ 複数のY軸を選択できます (Ctrl/Cmd キー)</p>
+            </section>
+            
+            <!-- 管理図用パラメータ設定 -->
+            <section id="controlChartParams" class="hidden border-t pt-4 space-y-4">
+                <h3 class="text-md font-semibold text-gray-700">管理図パラメータ</h3>
+                <div>
+                    <label for="subgroupSize" class="block text-sm font-medium text-gray-700 mb-1">サブグループサイズ ($n$)</label>
+                    <input type="number" id="subgroupSize" value="5" min="2" class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 rounded-md shadow-sm">
+                    <p class="text-xs text-gray-500 mt-1">($X$-bar/R 管理図の場合に適用)</p>
+                </div>
+            </section>
+        </aside>
+
+        <!-- メインコンテンツ (グラフ描画エリア) -->
+        <div class="main-content p-6 flex flex-col">
+            <div class="flex-grow flex items-center justify-center">
+                <div id="chart-container" class="bg-white p-4 rounded-lg shadow-xl flex-grow overflow-hidden">
+                    <p class="text-gray-400 text-center text-xl pt-[20%]">左側のサイドバーからデータとグラフタイプを選択し、「グラフを作成」ボタンを押してください。</p>
+                </div>
+            </div>
+            
+            <!-- データプレビュー -->
+            <div class="mt-6 bg-white p-4 rounded-lg shadow-xl overflow-x-auto max-h-64">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2 border-b pb-1">データプレビュー</h3>
+                <table id="dataTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr id="tableHeader"></tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200 text-sm">
+                        <tr><td colspan="100" class="text-center py-4 text-gray-500">データがロードされていません。</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white p-3 text-center text-xs">
+        <p>Plotly.js と Tailwind CSS を利用したグラフ作成アプリ</p>
+    </footer>
+
+    <script>
+        // グローバルなDOM要素変数
+        let rawData = [];
+        let headerNames = [];
+        let chartInitialized = false;
+        
+        // FIX: alert()の代替としてメッセージ表示ユーティリティを追加
+        function displayMessage(message, isError = false) {
+            const container = document.getElementById('message-container');
+            if (container) {
+                const bgColor = isError ? 'bg-red-100 border-red-400 text-red-700' : 'bg-green-100 border-green-400 text-green-700';
+                const strongText = isError ? 'エラー:' : '情報:';
+                container.innerHTML = `
+                    <div class="${bgColor} border px-4 py-3 rounded-lg relative shadow-lg" role="alert">
+                        <strong class="font-bold">${strongText}</strong>
+                        <span class="block sm:inline ml-2">${message}</span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer" onclick="document.getElementById('message-container').innerHTML = ''">
+                            <svg class="fill-current h-6 w-6 text-indigo-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.03a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>`;
+                setTimeout(() => { container.innerHTML = ''; }, 5000);
+            } else {
+                console.log(message);
+            }
+        }
+
+        // D4, d2, A2などの定数 (JIS Z 9021-1:2018より)
+        const CONTROL_CHART_CONSTANTS = {
+            2: { d2: 1.128, A2: 1.880, D4: 3.267, E2: 2.660, c4: 0.7979 },
+            3: { d2: 1.693, A2: 1.023, D4: 2.574, E2: 1.772, c4: 0.8862 },
+            4: { d2: 2.059, A2: 0.729, D4: 2.282, E2: 1.457, c4: 0.9213 },
+            5: { d2: 2.326, A2: 0.577, D4: 2.114, E2: 1.290, c4: 0.9400 },
+            6: { d2: 2.534, A2: 0.483, D4: 2.004, E2: 1.184, c4: 0.9515 },
+            7: { d2: 2.704, A2: 0.419, D4: 1.924, E2: 1.109, c4: 0.9594 },
+            8: { d2: 2.847, A2: 0.373, D4: 1.864, E2: 1.054, c4: 0.9650 },
+            9: { d2: 2.970, A2: 0.337, D4: 1.816, E2: 1.009, c4: 0.9693 },
+            10: { d2: 3.078, A2: 0.308, D4: 1.777, E2: 0.975, c4: 0.9727 },
+        };
+
+        // DOM要素
+        let fileInput, chartType, xAxis, yAxis, createChartBtn, downloadChartBtn, yAxisHint, dataTable, tableHeader, tableBody, controlChartParams, subgroupSizeInput;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // FIX: chartContainer の宣言をここで const から削除 (下のdownloadChartAsImageで改めて取得するため)
+            const chartContainer = document.getElementById('chart-container');
+            fileInput = document.getElementById('fileInput');
+            chartType = document.getElementById('chartType');
+            xAxis = document.getElementById('xAxis');
+            yAxis = document.getElementById('yAxis');
+            createChartBtn = document.getElementById('createChartBtn');
+            downloadChartBtn = document.getElementById('downloadChartBtn');
+            yAxisHint = document.getElementById('yAxisHint');
+            dataTable = document.getElementById('dataTable');
+            tableHeader = document.getElementById('tableHeader');
+            tableBody = document.getElementById('tableBody');
+            controlChartParams = document.getElementById('controlChartParams');
+            subgroupSizeInput = document.getElementById('subgroupSize');
+
+            // イベントリスナー設定
+            fileInput.addEventListener('change', handleFile);
+            createChartBtn.addEventListener('click', () => createChart(chartContainer));
+            chartType.addEventListener('change', toggleControls);
+            yAxis.multiple = true; // Y軸は複数選択可能
+
+            // データの初期化
+            updateAxisOptions();
+            toggleControls();
+            
+            // Plotly初期メッセージ
+            if (!chartInitialized) {
+                Plotly.newPlot('chart-container', [], {
+                    xaxis: { visible: false },
+                    yaxis: { visible: false },
+                    annotations: [{
+                        text: 'データを選択し、グラフを作成してください',
+                        xref: 'paper', yref: 'paper',
+                        x: 0.5, y: 0.5,
+                        showarrow: false,
+                        font: { size: 24, color: '#9ca3af' }
+                    }],
+                    margin: { t: 50, b: 50, l: 50, r: 50 }
+                }, { responsive: true, displayModeBar: false });
+                chartInitialized = true;
+            }
+        });
+
+        function toggleControls() {
+            const type = chartType.value;
+            const isControlChart = ['xbar', 'rs'].includes(type);
+
+            // X/Y軸の有効化
+            xAxis.disabled = !rawData.length;
+            yAxis.disabled = !rawData.length;
+            
+            // X-bar/R_s管理図の場合、Y軸は単一選択に強制
+            if (isControlChart) {
+                yAxis.multiple = false;
+                yAxisHint.classList.add('hidden');
+            } else {
+                yAxis.multiple = true;
+                yAxisHint.classList.remove('hidden');
+            }
+
+            // 管理図パラメータの表示
+            if (isControlChart) {
+                controlChartParams.classList.remove('hidden');
+            } else {
+                controlChartParams.classList.add('hidden');
+            }
+        }
+
+        function updateAxisOptions(selectedX = null, selectedY = []) {
+            // オプションをクリア
+            xAxis.innerHTML = '<option value="">-- 列を選択 --</option>';
+            yAxis.innerHTML = '<option value="">-- 列を選択 --</option>';
+            
+            // ヘッダー名に基づいてオプションを追加
+            headerNames.forEach(header => {
+                const xOption = document.createElement('option');
+                xOption.value = header;
+                xOption.textContent = header;
+                if (header === selectedX) xOption.selected = true;
+                xAxis.appendChild(xOption);
+
+                const yOption = document.createElement('option');
+                yOption.value = header;
+                yOption.textContent = header;
+                if (selectedY.includes(header)) yOption.selected = true;
+                yAxis.appendChild(yOption);
+            });
+        }
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // FIX: extension の定義を onload の外に移動 (スコープの問題を解決)
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = e.target.result;
+                // const extension = file.name.split('.').pop().toLowerCase(); // 元のコードから削除
+                
+                try {
+                    if (['xlsx', 'xls'].includes(extension)) {
+                        processExcel(data);
+                    } else if (extension === 'csv') {
+                        processCSV(data);
+                    } else {
+                        displayMessage('サポートされていないファイル形式です。', true);
+                    }
+                    displayMessage(`ファイル "${file.name}" のロードが完了しました。`);
+                } catch (error) {
+                    console.error("ファイル処理エラー:", error);
+                    displayMessage('ファイルの読み込みまたは解析中にエラーが発生しました。', true);
+                }
+            };
+
+            if (['xlsx', 'xls'].includes(extension)) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        function processExcel(data) {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (json.length === 0) {
+                displayMessage('ファイルにデータが見つかりませんでした。', true);
+                return;
+            }
+
+            headerNames = json[0].map(h => String(h).trim());
+            rawData = json.slice(1);
+            
+            updateAxisOptions();
+            displayDataPreview();
+        }
+
+        function processCSV(data) {
+            Papa.parse(data, {
+                header: false,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data.length === 0) {
+                        displayMessage('ファイルにデータが見つかりませんでした。', true);
+                        return;
+                    }
+                    headerNames = results.data[0].map(h => String(h).trim());
+                    rawData = results.data.slice(1);
+
+                    updateAxisOptions();
+                    displayDataPreview();
+                },
+                error: function(error) {
+                    console.error("CSV解析エラー:", error);
+                    displayMessage('CSVファイルの解析中にエラーが発生しました。', true);
+                }
+            });
+        }
+
+        function displayDataPreview() {
+            // ヘッダー表示
+            tableHeader.innerHTML = headerNames.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+
+            // データ本体表示 (最初の10行まで)
+            tableBody.innerHTML = '';
+            const previewData = rawData.slice(0, 10);
+            if (previewData.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="100" class="text-center py-4 text-gray-500">データがロードされていません。</td></tr>';
+                 downloadChartBtn.disabled = true;
+                 return;
+            }
+
+            previewData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = row.map(cell => `<td class="px-6 py-4 whitespace-nowrap">${String(cell)}</td>`).join('');
+                tableBody.appendChild(tr);
+            });
+            
+            downloadChartBtn.disabled = false;
+        }
+
+        function getColumnData(columnName) {
+            const index = headerNames.indexOf(columnName);
+            if (index === -1) return [];
+            return rawData.map(row => row[index]).filter(v => v !== null && v !== undefined && v !== '');
+        }
+
+        function calculateControlChart(data, n, chartType) {
+            const constants = CONTROL_CHART_CONSTANTS[n];
+            if (!constants) {
+                throw new Error(`サブグループサイズ n=${n} の管理図定数が見つかりません。`);
+            }
+
+            // データをサブグループに分割
+            const subgroups = [];
+            for (let i = 0; i < data.length; i += n) {
+                subgroups.push(data.slice(i, i + n).map(v => parseFloat(v)).filter(v => !isNaN(v)));
+            }
+            
+            const validSubgroups = subgroups.filter(g => g.length === n);
+            if (validSubgroups.length < 2) {
+                throw new Error(`有効なサブグループが2つ未満です (サイズ n=${n})。データを確認してください。`);
+            }
+            
+            let subgroupMeans = [];
+            let subgroupRanges = []; // Rs (移動範囲) 用
+
+            if (chartType === 'xbar') {
+                subgroupMeans = validSubgroups.map(g => g.reduce((a, b) => a + b, 0) / n);
+                // RsチャートのR計算
+                subgroupRanges = validSubgroups.map(g => Math.max(...g) - Math.min(...g));
+            } else if (chartType === 'rs') {
+                // Rsチャートは移動範囲 (Rs) のみを扱う
+                for (let i = 0; i < validSubgroups.length; i++) {
+                    const group = validSubgroups[i];
+                    if (i === 0) {
+                        subgroupRanges.push(0); // 最初のサブグループの移動範囲は0
+                    } else {
+                        const prevGroup = validSubgroups[i - 1];
+                        const lastValuePrev = prevGroup[prevGroup.length - 1];
+                        const firstValueCurrent = group[0];
+                        subgroupRanges.push(Math.abs(firstValueCurrent - lastValuePrev));
+                    }
+                }
+            }
+
+
+            // 平均範囲 $\bar{R}$ の計算 (X-bar/R_s共通)
+            const Rbar = subgroupRanges.reduce((a, b) => a + b, 0) / subgroupRanges.length;
+
+            let UCL, CL, LCL;
+
+            if (chartType === 'xbar') {
+                // $\bar{\bar{X}}$ (X二重棒) の計算
+                const Xdoublebar = subgroupMeans.reduce((a, b) => a + b, 0) / subgroupMeans.length;
+                
+                CL = Xdoublebar;
+                UCL = CL + constants.A2 * Rbar;
+                LCL = CL - constants.A2 * Rbar;
+
+                return {
+                    CL: CL,
+                    UCL: UCL,
+                    LCL: LCL,
+                    data: subgroupMeans,
+                    Rbar: Rbar
+                };
+            } else if (chartType === 'rs') {
+                // R_s (移動範囲) チャート
+                CL = Rbar;
+                UCL = constants.D4 * Rbar;
+                LCL = 0; // Rsチャートの下限管理限界は通常0
+                
+                return {
+                    CL: CL,
+                    UCL: UCL,
+                    LCL: LCL,
+                    data: subgroupRanges
+                };
+            }
+            
+            throw new Error('サポートされていない管理図タイプです。');
+        }
+
+        async function createChart(chartContainer) {
+            const type = chartType.value;
+            const xCol = xAxis.value;
+            const yCol = yAxis.value;
+            
+            if (!xCol || !yCol || !type) {
+                displayMessage('X軸、Y軸、グラフタイプをすべて選択してください。', true);
+                return;
+            }
+
+            try {
+                let plotData = [];
+                let layout = {};
+
+                // 選択されたY軸の列を取得
+                const yValues = getColumnData(yCol).map(v => parseFloat(v));
+                
+                if (yValues.some(isNaN)) {
+                    displayMessage('選択されたY軸の列に数値ではないデータが含まれています。', true);
+                    return;
+                }
+
+                // X軸のカテゴリ/ラベルを取得
+                let xLabels = getColumnData(xCol).slice(0, yValues.length);
+                
+                // データ数が少ない場合の調整
+                if (xLabels.length !== yValues.length) {
+                    displayMessage('X軸とY軸のデータ行数が一致しません。', true);
+                    return;
+                }
+
+                switch (type) {
+                    case 'line':
+                    case 'scatter':
+                        plotData.push({
+                            x: xLabels,
+                            y: yValues,
+                            mode: type === 'line' ? 'lines+markers' : 'markers',
+                            type: 'scatter',
+                            name: yCol,
+                            marker: { size: 8 }
+                        });
+
+                        layout = {
+                            title: { text: `データプロット (${type})` },
+                            xaxis: { title: xCol, automargin: true },
+                            yaxis: { title: yCol, automargin: true },
+                            margin: { t: 50, b: 50, l: 50, r: 50 },
+                            hovermode: 'x unified',
+                            legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center' }
+                        };
+                        break;
+                        
+                    case 'bar':
+                        plotData.push({
+                            x: xLabels,
+                            y: yValues,
+                            type: 'bar',
+                            name: yCol,
+                        });
+                        
+                        layout = {
+                            title: { text: `データプロット (${type})` },
+                            xaxis: { title: xCol, automargin: true },
+                            yaxis: { title: yCol, automargin: true },
+                            margin: { t: 50, b: 50, l: 50, r: 50 },
+                            legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center' }
+                        };
+                        break;
+
+                    case 'histogram':
+                        plotData.push({
+                            x: yValues, // Y軸データのみを使用
+                            type: 'histogram',
+                            name: yCol,
+                        });
+
+                        layout = {
+                            title: { text: `ヒストグラム (${yCol})` },
+                            xaxis: { title: yCol, automargin: true },
+                            yaxis: { title: '頻度', automargin: true },
+                            bargap: 0.05,
+                            margin: { t: 50, b: 50, l: 50, r: 50 }
+                        };
+                        break;
+
+                    case 'xbar':
+                    case 'rs':
+                        const n = parseInt(subgroupSizeInput.value, 10);
+                        if (isNaN(n) || n < 2 || n > 10) {
+                            displayMessage('サブグループサイズ n は 2 から 10 の間の数値でなければなりません。', true);
+                            return;
+                        }
+
+                        const controlResult = calculateControlChart(yValues, n, type);
+
+                        // X軸ラベルの準備: サブグループ番号
+                        const subgroupLabels = Array.from({ length: controlResult.data.length }, (_, i) => i + 1);
+
+                        // 管理限界線のデータ
+                        const limitTrace = (value, name, color) => ({
+                            x: subgroupLabels,
+                            y: Array(subgroupLabels.length).fill(value),
+                            mode: 'lines',
+                            type: 'scatter',
+                            name: name,
+                            line: { color: color, dash: 'dash' },
+                            hoverinfo: 'name+y'
+                        });
+
+                        // 実際のデータプロット
+                        const dataTrace = {
+                            x: subgroupLabels,
+                            y: controlResult.data,
+                            mode: 'lines+markers',
+                            type: 'scatter',
+                            name: type === 'xbar' ? '$\bar{X}$ (平均)' : '$R_s$ (移動範囲)',
+                            marker: { size: 8, color: '#3b82f6' },
+                            line: { color: '#3b82f6' }
+                        };
+
+                        plotData = [
+                            limitTrace(controlResult.UCL, 'UCL (上限管理限界)', '#ef4444'),
+                            limitTrace(controlResult.CL, 'CL (中心線)', '#10b981'),
+                            limitTrace(controlResult.LCL, 'LCL (下限管理限界)', '#ef4444'),
+                            dataTrace
+                        ];
+
+                        layout = {
+                            title: { 
+                                text: type === 'xbar' ? `$\bar{X}$ 管理図 (n=${n})` : `$R_s$ 管理図 (n=${n})` 
+                            },
+                            xaxis: { 
+                                title: 'サブグループ番号', automargin: true 
+                            },
+                            yaxis: { 
+                                title: type === 'xbar' ? '$\bar{X}$ (平均)' : '$R_s$ (移動範囲)', automargin: true 
+                            },
+                            margin: { t: 50, b: 50, l: 50, r: 50 },
+                            hovermode: 'x unified',
+                            legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center' }
+                        };
+
+                        break;
+
+                    default:
+                        displayMessage('グラフタイプを選択してください。', true);
+                        return;
+                }
+
+                // グラフ描画
+                await Plotly.newPlot(chartContainer, plotData, layout, { 
+                    responsive: true, 
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['lasso2d', 'select2d', 'sendDataToCloud', 'hoverClosestCartesian', 'hoverCompareCartesian'],
+                    displaylogo: false
+                });
+
+                downloadChartBtn.disabled = false;
+
+            } catch (error) {
+                console.error("グラフ描画エラー:", error);
+                displayMessage(`グラフの描画中にエラーが発生しました: ${error.message}`, true);
+                downloadChartBtn.disabled = true;
+            }
+        }
+
+        // --- グラフを画像としてダウンロード ---
+        function downloadChartAsImage() {
+            // FIX: スコープの問題で参照できないグローバル変数 'chartContainer' 
+            // の代わりに、DOM要素をIDで直接取得する
+            const chartContainerElement = document.getElementById('chart-container');
+            
+            if (!chartContainerElement || !chartContainerElement.data) {
+                // alert()の代わりにdisplayMessageを使用
+                displayMessage('グラフがまだ描画されていません。ダウンロード前にグラフを作成してください。', true);
+                return;
+            }
+
+            const now = new Date();
+            const filename = `chart_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.png`;
+
+            //Plotly.downloadImage(chartContainer, {
+            Plotly.downloadImage(chartContainerElement, { // FIX: 確実に取得した要素を使用
+                format: 'png',
+                filename: filename, 
+                width: 1200,
+                height: 750
+            }).catch(err => {
+                console.error('画像ダウンロードエラー:', err);
+                // FIX: alert()をdisplayMessageに置き換える (必須ルール)
+                displayMessage('グラフ画像のダウンロード中にエラーが発生しました。グラフが正しく描画されているか確認してください。', true);
+            });
+        }
+
+        
+        // グラフをPNGとしてダウンロードする (この関数はボタンから呼ばれていないため、修正はダウンロードロジックのみ)
+        function handleDownload() {
+             const chartContainerElement = document.getElementById('chart-container'); // ここも修正
+            // Plotly.jsのダウンロード機能を使用
+            Plotly.downloadImage(chartContainerElement, {
+                format: 'png',
+                filename: 'chart_download',
+                height: 600,
+                width: 900
+            }).catch(error => {
+                console.error("ダウンロードエラー:", error);
+                // FIX: alert()をdisplayMessageに置き換える (必須ルール)
+                displayMessage('ダウンロード中にエラーが発生しました。', true);
+            });
+        }
+    </script>
+</body>
+</html>

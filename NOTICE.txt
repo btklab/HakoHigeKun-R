@@ -1,0 +1,34 @@
+Third-Party Library Notices
+===========================
+
+This project bundles the following third-party libraries for offline use.
+Each retains its original license, reproduced or referenced below.
+
+---
+
+Tailwind CSS
+License: MIT
+Source: https://tailwindcss.com/
+License text: https://github.com/tailwindlabs/tailwindcss/blob/master/LICENSE
+
+Plotly.js
+License: MIT
+Source: https://plotly.com/javascript/
+License text: https://github.com/plotly/plotly.js/blob/master/LICENSE
+
+PapaParse
+License: MIT
+Source: https://www.papaparse.com/
+License text: https://github.com/mholt/PapaParse/blob/master/LICENSE
+
+SheetJS (xlsx)
+License: SheetJS Community Edition (MIT-compatible)
+Source: https://sheetjs.com/
+License text: https://github.com/SheetJS/sheetjs/blob/master/LICENSE
+
+---
+
+btklab's own code (index.html and scripts):
+License: MIT
+Copyright (c) 2025 btklab
+

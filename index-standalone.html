@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-lang-key="pageTitle">HakoHigeKun-R - Instant Offline Box Plotter</title>
+    <!--
+        HakoHigeKun-R
+        Copyright (c) 2025 btklab
+        Licensed under the MIT License
+    
+        This app includes third-party libraries:
+          - Tailwind CSS (MIT)
+          - Plotly.js (MIT)
+          - PapaParse (MIT)
+          - SheetJS/xlsx (MIT-compatible)
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+        /* Custom Styles: Adjust sidebar width and main content */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+        }
+        .main-content {
+            flex-grow: 1;
+        }
+        /* Set height for the Plotly chart container */
+        #chart-container {
+            min-height: 600px;
+        }
+        /* Style the scrollbar for better visibility */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
+        }
+        /* Sticky headers and labels for the summary statistics table */
+        #summary-statistics-container th, 
+        #summary-statistics-container .sticky-stat-label {
+            position: sticky;
+            z-index: 10;
+        }
+        #summary-statistics-container th {
+            top: 0;
+        }
+        #summary-statistics-container .sticky-stat-label {
+            left: 0;
+            background-color: white; /* Set background to white for visibility on horizontal scroll */
+            border-right: 1px solid #e5e7eb; /* Add a border line */
+        }
+        .lang-btn.active {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            font-weight: bold;
+        }
+        /* ======================================= */
+        /* === Print Styles === */
+        /* ======================================= */
+        @media print {
+            .sidebar, header, button, .hidden-print, .language-switcher { display: none !important; }
+            .main-container { display: block !important; }
+            .main-content, #chart-area { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            #chart-container { min-height: auto !important; height: auto !important; width: 100% !important; }
+            body { background-color: white !important; color: black !important; }
+            .shadow-lg, .rounded-xl { box-shadow: none !important; border-radius: 0 !important; }
+        }
+</style>
+</head>
+<body class="bg-gray-50 flex h-screen overflow-hidden text-gray-800 font-sans">
+
+    <div class="sidebar bg-white p-6 shadow-xl overflow-y-auto">
+        <h1 class="text-3xl font-extrabold text-blue-700 mb-2 border-b pb-2">
+            <span data-lang-key="appTitle">📊 箱ひげくん-R</span>
+        </h1>
+
+        <div class="language-switcher text-right mb-4">
+            <button onclick="setLanguage('ja')" class="lang-btn text-xs py-1 px-3 rounded-l-lg border border-gray-300" data-lang="ja">日本語</button>
+            <button onclick="setLanguage('en')" class="lang-btn text-xs py-1 px-3 rounded-r-lg border-t border-b border-r border-gray-300" data-lang="en">English</button>
+        </div>
+        
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-3 text-gray-700" data-lang-key="fileUploadTitle">📤 ファイルアップロード</h2>
+            <div class="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-blue-50">
+                <label for="file-input" class="block text-sm font-medium text-gray-700 mb-2" data-lang-key="fileUploadLabel">データファイルを選択、またはドラッグ＆ドロップ(*.xlsx, *.csv)</label>
+                <input type="file" id="file-input" accept=".csv, .xlsx, .xls" class="w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-500 file:text-white
+                    hover:file:bg-blue-600
+                ">
+                <p id="file-status" class="mt-2 text-sm text-green-600 font-medium hidden"></p>
+            </div>
+        </div>
+
+        <div id="chart-settings" class="mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2" data-lang-key="chartSettingsTitle">⚙️ グラフの設定</h2>
+            
+            <label for="chart-type-select" class="block text-sm font-medium text-gray-700 mb-2" data-lang-key="chartTypeLabel">グラフの種類を選択</label>
+            <select id="chart-type-select" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-4">
+            </select>
+
+            <div id="chart-config-area" class="space-y-4 p-4 border border-gray-200 rounded-lg bg-white shadow-inner">
+                <p class="text-gray-500 italic" data-lang-key="chartConfigPlaceholder">データを選択し、グラフの種類を選ぶと設定が表示されます。</p>
+            </div>
+            
+            <div class="mt-4">
+                <label for="chart-title" class="block text-sm font-medium text-gray-700" data-lang-key="chartTitleLabel">グラフタイトル</label>
+                <input type="text" id="chart-title" 
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                    data-lang-key-placeholder="chartTitlePlaceholder">
+            </div>
+
+            <button onclick="drawChart()" id="draw-chart-button" class="mt-6 w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition duration-150 transform hover:scale-[1.01] disabled:bg-gray-400" disabled>
+                <span data-lang-key="drawChartButton">🚀 グラフを描画</span>
+            </button>
+        </div>
+
+        <a href="https://github.com/btklab/HakoHigeKun-R" target="_blank" class="flex items-center hover:text-gray-400 font-medium text-gray-400">
+            <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M12 0C5.37 0 0 5.37 0 12c0 5.303 3.438 9.8 8.205 11.387.6.113.82-.26.82-.577v-2.234c-3.338.726-4.033-1.415-4.033-1.415-.546-1.387-1.334-1.756-1.334-1.756-1.09-.745.082-.73.082-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.304.762-1.604-2.665-.304-5.467-1.333-5.467-5.93 0-1.31.468-2.381 1.235-3.22-.124-.303-.536-1.524.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 0 1 3-.404c1.02.005 2.045.137 3 .404 2.29-1.552 3.296-1.23 3.296-1.23.655 1.653.243 2.874.12 3.176.77.839 1.232 1.91 1.232 3.22 0 4.61-2.807 5.625-5.48 5.921.43.37.813 1.1.813 2.222v3.293c0 .32.218.694.825.576C20.565 21.796 24 17.303 24 12c0-6.63-5.373-12-12-12z"/>
+            </svg>
+            GitHub
+        </a>
+        <a href="LICENSE" target="_blank" class="flex items-center hover:text-gray-400 font-medium text-gray-400">
+            <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 2a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6z"/>
+            </svg>
+            MIT License
+        </a>
+        <footer class="mt-8 pt-4 border-t border-gray-200 text-gray-600 text-xs text-center">
+            <p>
+            © 2025 btklab.
+                <span data-lang-key="footerMadeWith">Made with</span> ❤
+                <a href="https://plotly.com/javascript/" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-semibold">Plotly.js</a>, 
+                <a href="https://www.papaparse.com/" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-semibold">PapaParse</a>, 
+                <a href="https://sheetjs.com/" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-semibold">SheetJS</a>, and
+                <a href="https://tailwindcss.com/" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-semibold">Tailwind CSS</a>.
+            </p>
+        </footer>
+    </div>
+
+    <div class="main-content flex flex-col p-8 overflow-y-auto">
+        
+        <div id="chart-area" class="flex-grow bg-white p-6 rounded-xl shadow-lg mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-700" data-lang-key="chartDisplayTitle">📈 グラフ表示</h2>
+                <button onclick="downloadChartAsImage()" id="download-image-btn" class="py-2 px-4 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 transform disabled:bg-gray-400" disabled>
+                    <span data-lang-key="downloadImageButton">画像ダウンロード (PNG)</span>
+                </button>
+            </div>
+            <div id="chart-container" class="w-full">
+                <p class="text-gray-500 text-center pt-20" data-lang-key="chartContainerPlaceholder">ファイルをアップロードし、設定を行ってグラフを描画してください。</p>
+            </div>
+        </div>
+
+        <div id="data-preview-section" class="mb-8 hidden bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-gray-700" data-lang-key="dataPreviewTitle">📄 データプレビュー</h2>
+            <div class="overflow-x-auto max-h-60">
+                <table id="data-preview-table" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0"></thead>
+                    <tbody class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="summary-statistics-section" class="mb-8 hidden bg-white p-6 rounded-xl shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-700" data-lang-key="summaryStatsTitle">🔢 要約統計量 (数値列のみ)</h2>
+                <button onclick="downloadSummaryStatistics()" id="download-summary-btn" class="py-2 px-4 bg-green-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 transform disabled:bg-gray-400" disabled>
+                   <span data-lang-key="downloadCsvButton">CSVダウンロード</span>
+                </button>
+            </div>
+            <div id="summary-statistics-container" class="overflow-x-auto">
+                <p class="text-gray-500 italic" data-lang-key="summaryStatsPlaceholder">データが読み込まれると、数値列の統計が表示されます。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================================================================================
+        // Internationalization (i18n)
+        // ===================================================================================
+
+        // Holds all UI strings for different languages.
+        const translations = {
+            en: {
+                pageTitle: "📊 HakoHigeKun-R - Instant Offline Box Plotter",
+                appTitle: "📊 HakoHigeKun-R",
+                fileUploadTitle: "📤 File Upload",
+                fileUploadLabel: "Select or drag & drop a data file (*.xlsx, *.csv)",
+                fileStatusSuccess: (rows, cols) => `✅ File loaded successfully<br>${rows} rows, ${cols} columns`,
+                unsupportedFile: "Unsupported file format. Please upload a CSV, XLSX, or XLS file.",
+                invalidData: (format) => `${format} file does not contain valid data.`,
+                parseError: (format, msg) => `An error occurred while parsing the ${format} file: ${msg}`,
+                readError: (format) => `An error occurred while reading the ${format} file.`,
+                chartSettingsTitle: "⚙️ Chart Settings",
+                chartTypeLabel: "Select Chart Type",
+                chartConfigPlaceholder: "Select data and chart type to see settings.",
+                chartTitleLabel: "Chart Title",
+                chartTitlePlaceholder: "Untitled (auto-generated if blank)",
+                drawChartButton: "🚀 Draw Chart",
+                chartDisplayTitle: "📈 Chart Display",
+                downloadImageButton: "Download Image (PNG)",
+                chartContainerPlaceholder: "Upload a file and configure settings to draw a chart.",
+                dataPreviewTitle: "📄 Data Preview",
+                summaryStatsTitle: "🔢 Summary Statistics (Numeric columns only)",
+                downloadCsvButton: "Download CSV",
+                summaryStatsPlaceholder: "Statistics for numeric columns will be displayed when data is loaded.",
+                noNumericData: "No columns with numeric data were found.",
+                downloadStatsError: "No statistics data to download.",
+                selectOptionDefault: "--- Select ---",
+                indexOption: "--- Index (1, 2, 3...) ---",
+                yAxisMultiSelectHint: "Hold Ctrl (Windows) / Cmd (Mac) to select multiple items.",
+                errorDrawingChart: "Error drawing chart",
+                errorCheckSettings: "An error occurred. Settings may be incorrect.",
+                errorNotImplemented: "This chart type is not yet implemented.",
+                errorMissingData: "Required data column not selected.",
+                errorMissingX: "Bar/Line charts require an X-axis or index selection.",
+                errorMissingY: "Y-axis data column not selected.",
+                errorBoxData: "Box plot requires a data column.",
+                errorPairPlot: "Pair plot requires at least two numeric columns.",
+                errorParetoCategory: "Category column is not selected.",
+                errorXRData: "X-Rs Control Chart requires at least two numeric data points.",
+                errorMRData: "Not enough data to calculate moving range.",
+                downloadImageError: "An error occurred while downloading the chart image. Please check if the chart is displayed correctly.",
+                chartTypes: {
+                    box: "Box Plot",
+                    histogram: "Histogram",
+                    bar: "Bar Chart",
+                    line: "Line Chart",
+                    scatter: "Scatter Plot",
+                    pairplot: "Pair Plot",
+                    pareto: "Pareto Chart",
+                    xrs_control_chart: "X-Rs Control Chart"
+                },
+                configLabels: {
+                    xAxisData: "Data Column (X-axis)",
+                    yAxisData: "Data Column (Y-axis)",
+                    groupColumn: "Group Column (X-axis) (optional)",
+                    colorGroup: "Color/Group Column (optional)",
+                    nBins: "Number of Bins (N_bins)",
+                    yAxisMulti: "Y-axis (Value) - Multi-select",
+                    xAxisLabel: "X-axis (Label)",
+                    yAxisValue: "Y-axis (Value)",
+                    regressionLine: "Regression Line (optional)",
+                    regression: { none: "None", linear: "Linear", poly: "Polynomial (2nd)" },
+                    paretoCategory: "Category Column",
+                    paretoValue: "Value Column (optional)",
+                    paretoValueOption: "(Count by rows)",
+                    paretoTopN: "Show Top N Items",
+                    paretoExcludeOther: 'Exclude "Other"',
+                    xrsData: "Data Column"
+                },
+                statLabels: {
+                    statistic: "Statistic",
+                    count: "count", mean: "mean", std: "std", min: "min",
+                    '25%': "25%", '50%': "50%", '75%': "75%", max: "max"
+                }
+            },
+            ja: {
+                pageTitle: "📊 箱ひげくんR - Instant Offline Box Plotter",
+                appTitle: "📊 箱ひげくんR"
+                fileUploadTitle: "📤 ファイルアップロード",
+                fileUploadLabel: "データファイルを選択、またはドラッグ＆ドロップ(*.xlsx, *.csv)",
+                fileStatusSuccess: (rows, cols) => `✅ ファイル読み込み完了<br>${rows}行, ${cols}列`,
+                unsupportedFile: "サポートされていないファイル形式です。CSV, XLSX, または XLSファイルをアップロードしてください。",
+                invalidData: (format) => `${format}ファイルに有効なデータが含まれていません。`,
+                parseError: (format, msg) => `${format}ファイルの解析中にエラーが発生しました: ${msg}`,
+                readError: (format) => `${format}ファイルの読み込み中にエラーが発生しました。`,
+                chartSettingsTitle: "⚙️ グラフの設定",
+                chartTypeLabel: "グラフの種類を選択",
+                chartConfigPlaceholder: "データを選択し、グラフの種類を選ぶと設定が表示されます。",
+                chartTitleLabel: "グラフタイトル",
+                chartTitlePlaceholder: "Untitled (空欄で自動設定)",
+                drawChartButton: "🚀 グラフを描画",
+                chartDisplayTitle: "📈 グラフ表示",
+                downloadImageButton: "画像ダウンロード (PNG)",
+                chartContainerPlaceholder: "ファイルをアップロードし、設定を行ってグラフを描画してください。",
+                dataPreviewTitle: "📄 データプレビュー",
+                summaryStatsTitle: "🔢 要約統計量 (数値列のみ)",
+                downloadCsvButton: "CSVダウンロード",
+                summaryStatsPlaceholder: "データが読み込まれると、数値列の統計が表示されます。",
+                noNumericData: "数値データを含む列が見つかりませんでした。",
+                downloadStatsError: "ダウンロードする統計データがありません。",
+                selectOptionDefault: "--- 選択 ---",
+                indexOption: "--- インデックス値 (1, 2, 3...) ---",
+                yAxisMultiSelectHint: "Ctrlキー(Windows)/Cmdキー(Mac)を押しながらクリックで複数選択できます。",
+                errorDrawingChart: "グラフ描画エラー",
+                errorCheckSettings: "エラーが発生しました。設定が正しくない可能性があります。",
+                errorNotImplemented: "このグラフタイプはまだ実装されていません。",
+                errorMissingData: "描画に必要なデータ列が選択されていません。",
+                errorMissingX: "棒グラフ、折れ線グラフにはX軸またはインデックスの選択が必要です。",
+                errorMissingY: "Y軸にデータ列が選択されていません。",
+                errorBoxData: "箱ひげ図にはデータ列が必要です。",
+                errorPairPlot: "行列散布図を描画するには、2つ以上の数値列が必要です。",
+                errorParetoCategory: "カテゴリ列が選択されていません。",
+                errorXRData: "X-Rs管理図を描画するには、2つ以上の数値データが必要です。",
+                errorMRData: "移動範囲を計算できるデータがありません。",
+                downloadImageError: "グラフ画像のダウンロード中にエラーが発生しました。グラフが正しく描画されているか確認してください。",
+                chartTypes: {
+                    histogram: 'ヒストグラム',
+                    box: '箱ひげ図',
+                    bar: '棒グラフ',
+                    line: '折れ線グラフ',
+                    scatter: '散布図',
+                    pairplot: '行列散布図', 
+                    pareto: 'パレート図',
+                    xrs_control_chart: 'X-Rs管理図',
+                },
+                configLabels: {
+                    xAxisData: "データ列 (X軸)",
+                    yAxisData: "データ列 (Y軸)",
+                    groupColumn: "グループ列 (X軸) (オプション)",
+                    colorGroup: "グループ列 (色分け) (オプション)",
+                    nBins: "ビンの数 (N_bins)",
+                    yAxisMulti: "Y軸 (値) - 複数選択可能",
+                    xAxisLabel: "X軸 (ラベル)",
+                    yAxisValue: "Y軸 (値)",
+                    regressionLine: "回帰線 (オプション)",
+                    regression: { none: "なし", linear: "線形", poly: "多項式 (2次)" },
+                    paretoCategory: "カテゴリ列",
+                    paretoValue: "集計値列 (オプション)",
+                    paretoValueOption: "(行数で集計)",
+                    paretoTopN: "上位N件表示",
+                    paretoExcludeOther: "「その他」を除外する",
+                    xrsData: "データ列"
+                },
+                statLabels: {
+                    statistic: "統計量",
+                    count: "count", mean: "mean", std: "std", min: "min",
+                    '25%': "25%", '50%': "50%", '75%': "75%", max: "max"
+                }
+            }
+        };
+        let currentLang = 'ja';
+
+        /**
+         * Sets the application language and updates the UI.
+         * @param {string} lang - The language to set ('en' or 'ja').
+         */
+        //function setLanguage(lang) {
+        //    currentLang = lang;
+        //    localStorage.setItem('language', lang); // Persist language setting
+        //    updateUI(lang);
+        //}
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('language', lang);
+
+            // CHART_TYPESを再生成
+            const t = translations[lang];
+            Object.assign(CHART_TYPES, t.chartTypes);
+        
+            updateUI(lang);
+        }
+        /**
+         * Updates all text elements in the UI to the selected language.
+         * @param {string} lang - The language to display ('en' or 'ja').
+         */
+        function updateUI(lang) {
+            document.documentElement.lang = lang;
+            const t = translations[lang];
+
+            // Update static text content using data-lang-key attributes
+            document.querySelectorAll('[data-lang-key]').forEach(el => {
+                const key = el.getAttribute('data-lang-key');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+
+            // Update placeholder text using data-lang-key-placeholder attributes
+            document.querySelectorAll('[data-lang-key-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-lang-key-placeholder');
+                if (t[key]) {
+                    el.placeholder = t[key];
+                }
+            });
+
+            // Update the active state of the language switcher buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+            });
+            
+            // Re-render dynamic UI components if data is already loaded
+            if (columns.length > 0) {
+                populateChartTypeSelect();
+                renderChartConfigUI();
+                renderSummaryStatistics(); // Re-render with translated headers
+            }
+        }
+        
+        // ===================================================================================
+        // Global Variables & Initial Settings
+        // ===================================================================================
+
+        let rawData = []; // Array of objects from the parsed file
+        let columns = []; // Array of column header strings
+        const chartContainer = document.getElementById('chart-container');
+        const fileInput = document.getElementById('file-input');
+        const chartTypeSelect = document.getElementById('chart-type-select');
+        const chartConfigArea = document.getElementById('chart-config-area');
+        const drawChartButton = document.getElementById('draw-chart-button');
+        const downloadImageBtn = document.getElementById('download-image-btn'); 
+        let calculatedSummaryStats = {}; // Cache for summary statistics data
+
+        // Chart type definitions (internal keys to translated names)
+        const CHART_TYPES = {
+            'box': '箱ひげ図',
+            'histogram': 'ヒストグラム',
+            'bar': '棒グラフ',
+            'line': '折れ線グラフ',
+            'scatter': '散布図',
+            'pairplot': '行列散布図', 
+            'pareto': 'パレート図',
+            'xrs_control_chart': 'X-Rs管理図',
+        };
+        
+        // Coefficients for X-Rs Control Chart (only for subgroup size n=2)
+        const CONTROL_CHART_COEFFICIENTS = { 2: { A2: 1.880, D4: 3.267, d2: 1.128, E2: 2.660 } };
+
+        /**
+         * Populates the chart type dropdown with translated options.
+         */
+        function populateChartTypeSelect() {
+            chartTypeSelect.innerHTML = '';
+            const chartTypeTranslations = translations[currentLang].chartTypes;
+            Object.keys(CHART_TYPES).forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = chartTypeTranslations[key] || CHART_TYPES[key];
+                chartTypeSelect.appendChild(option);
+            });
+        }
+        
+        // ===================================================================================
+        // Initialization
+        // ===================================================================================
+
+        /**
+         * Initializes the application.
+         */
+        function initializeApp() {
+            // Set language based on localStorage or browser preference
+            const savedLang = localStorage.getItem('language');
+            const browserLang = navigator.language.startsWith('ja') ? 'ja' : 'en';
+            setLanguage(savedLang || browserLang);
+            
+            // Populate the chart type dropdown
+            populateChartTypeSelect();
+
+            // Set up event listeners
+            fileInput.addEventListener('change', handleFileSelect);
+            chartTypeSelect.addEventListener('change', renderChartConfigUI);
+        }
+
+        // ===================================================================================
+        // File Handling
+        // ===================================================================================
+
+        /**
+         * Handles the file selection event and routes to the appropriate parser.
+         * @param {Event} event - The file input change event.
+         */
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileName = file.name.toLowerCase();
+            const t = translations[currentLang];
+
+            if (fileName.endsWith('.csv')) {
+                parseCSV(file);
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                parseExcel(file);
+            } else {
+                alert(t.unsupportedFile);
+                document.getElementById('file-status').classList.add('hidden');
+                document.getElementById('chart-settings').classList.add('hidden');
+            }
+            // Disable download button when a new file is loaded
+            downloadImageBtn.disabled = true;
+        }
+
+        /**
+         * Parses a CSV file using PapaParse.
+         * @param {File} file - The CSV file to parse.
+         */
+        function parseCSV(file) {
+            Papa.parse(file, {
+                header: true, 
+                dynamicTyping: true, 
+                skipEmptyLines: true, 
+                //encoding: 'Shift_JIS', 
+                encoding: 'UTF-8', 
+                complete: function(results) {
+                    const t = translations[currentLang];
+                    if (results.data.length === 0) {
+                        alert(t.invalidData('CSV'));
+                        return;
+                    }
+                    // Filter out any null headers that PapaParse might create
+                    const headers = results.meta.fields.filter(f => f != null);
+                    processParsedData(results.data, headers);
+                },
+                error: function(error) {
+                    alert(translations[currentLang].parseError('CSV', error.message));
+                }
+            });
+        }
+        
+        /**
+         * Parses an Excel file (.xlsx, .xls) using SheetJS.
+         * @param {File} file - The Excel file to parse.
+         */
+        function parseExcel(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const t = translations[currentLang];
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { 
+                        type: 'array', 
+                        cellDates: true, 
+                        raw: false 
+                    });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    let jsonDataArray = XLSX.utils.sheet_to_json(worksheet, { 
+                        header: 1, 
+                        raw: false 
+                    });
+                    
+                    if (jsonDataArray.length < 2) {
+                         alert(t.invalidData('Excel'));
+                         return;
+                    }
+
+                    // Extract headers and data rows
+                    const headers = jsonDataArray[0].map(h => String(h).trim() || `Column_${Math.random().toString(36).substring(7)}`);
+                    const dataRows = jsonDataArray.slice(1);
+                    const results = [];
+                    
+                    // Process each row to create a consistent object structure
+                    dataRows.forEach(rowData => {
+                        const row = {};
+                        let hasValidData = false;
+                        headers.forEach((header, j) => {
+                            let value = rowData[j];
+                            // Clean and type-cast values
+                            if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+                                value = null;
+                            } else if (typeof value === 'string') {
+                                const num = Number(value);
+                                value = isNaN(num) ? value : num;
+                            } else if (value instanceof Date) {
+                                value = value.toISOString();
+                            }
+                            row[header] = value;
+                            if (value !== null) hasValidData = true;
+                        });
+                        if (hasValidData) results.push(row);
+                    });
+                    
+                    if (results.length === 0) {
+                         alert(t.invalidData('Excel'));
+                         return;
+                    }
+                    processParsedData(results, headers);
+                } catch (error) {
+                    alert(t.parseError('Excel', error.message));
+                }
+            };
+            reader.onerror = () => alert(translations[currentLang].readError('Excel'));
+            reader.readAsArrayBuffer(file);
+        }
+        
+        /**
+         * Common data processing function after a file is parsed successfully.
+         * @param {Array<Object>} data - The parsed data.
+         * @param {Array<string>} fields - The column headers.
+         */
+        function processParsedData(data, fields) {
+            rawData = data;
+            columns = fields;
+
+            // Update UI to show file status and reveal settings
+            const statusElement = document.getElementById('file-status');
+            statusElement.innerHTML = translations[currentLang]
+                .fileStatusSuccess(rawData.length, columns.length);
+            statusElement.classList.remove('hidden');
+
+            document.getElementById('chart-settings').classList.remove('hidden');
+            document.getElementById('data-preview-section').classList.remove('hidden');
+            document.getElementById('summary-statistics-section').classList.remove('hidden'); 
+            drawChartButton.disabled = false;
+            
+            // Render UI components with the new data
+            renderDataPreview();
+            renderSummaryStatistics(); 
+            renderChartConfigUI(); 
+            
+            // If the initial chart type is box plot and a numeric column exists, draw the chart automatically
+            const initialChartType = chartTypeSelect.value;
+            if (initialChartType === 'box' && findFirstNumericColumn(data, fields)) {
+                drawChart();
+            }
+        }
+        
+        /**
+         * Helper function to find the name of the first column containing numerical data.
+         * @param {Array<Object>} data - The parsed data.
+         * @param {Array<string>} columns - The column headers.
+         * @returns {string|null} The name of the first numeric column, or null if none is found.
+         */
+        function findFirstNumericColumn(data, columns) {
+            if (!data || data.length === 0 || columns.length === 0) return null;
+
+            for (const col of columns) {
+                // Check the first few rows (e.g., 10) to see if the column is likely numeric
+                const sampleSize = Math.min(data.length, 10);
+                let numericCount = 0;
+
+                for (let i = 0; i < sampleSize; i++) {
+                    const value = data[i][col];
+                    // Check if the value is a number and not NaN
+                    if (typeof value === 'number' && !isNaN(value)) {
+                        numericCount++;
+                    }
+                }
+
+                // If more than half of the sample size are numeric, consider it a numeric column
+                if (numericCount > sampleSize / 2) {
+                    return col;
+                }
+            }
+
+            return null;
+        }
+
+        // ===================================================================================
+        // UI Rendering Functions
+        // ===================================================================================
+
+        /**
+         * Renders a preview of the first 10 rows of data in a table.
+         */
+        function renderDataPreview() {
+            const table = document.getElementById('data-preview-table');
+            table.innerHTML = '';
+            
+            // Create table header
+            const thead = table.createTHead();
+            const headerRow = thead.insertRow();
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-100';
+                headerRow.appendChild(th);
+            });
+
+            // Create table body with preview data
+            const tbody = table.createTBody();
+            const rowsToShow = Math.min(rawData.length, 10);
+            for (let i = 0; i < rowsToShow; i++) {
+                const row = tbody.insertRow();
+                columns.forEach(col => {
+                    const cell = row.insertCell();
+                    const value = rawData[i][col];
+                    cell.textContent = value ?? ''; // Use nullish coalescing for cleaner code
+                    cell.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-500';
+                });
+            }
+        }
+
+        /**
+         * Helper function to calculate basic statistics for an array of numbers.
+         * @param {Array<number>} values - Array of numerical data.
+         * @returns {Object} An object containing statistical measures.
+         */
+        function calculateStats(values) {
+            if (values.length === 0) {
+                return { count: 0, mean: NaN, std: NaN, min: NaN, '25%': NaN, '50%': NaN, '75%': NaN, max: NaN };
+            }
+            const sorted = [...values].sort((a, b) => a - b);
+            const n = sorted.length;
+            const mean = values.reduce((s, v) => s + v, 0) / n;
+            const variance = n > 1 ? values.map(v => (v - mean) ** 2).reduce((s, v) => s + v, 0) / (n - 1) : 0;
+            const std = Math.sqrt(variance);
+            const quantile = (arr, q) => {
+                const pos = (arr.length) * q;
+                const base = Math.floor(pos);
+                const rest = pos - base;
+                if (base < 1) return arr[0];
+                if (base >= arr.length) return arr[arr.length - 1];
+                return arr[base - 1] + rest * (arr[base] - arr[base - 1]);
+            };
+            return { 
+                count: n, 
+                mean, 
+                std, 
+                min: sorted[0], 
+                '25%': quantile(sorted, 0.25), 
+                '50%': quantile(sorted, 0.5), 
+                '75%': quantile(sorted, 0.75), 
+                max: sorted[n - 1] 
+            };
+        }
+
+        /**
+         * Renders a table with summary statistics for all numeric columns.
+         */
+        function renderSummaryStatistics() {
+            const container = document.getElementById('summary-statistics-container');
+            const section = document.getElementById('summary-statistics-section');
+            const downloadBtn = document.getElementById('download-summary-btn');
+            const t = translations[currentLang];
+
+            container.innerHTML = '';
+            downloadBtn.disabled = true; 
+            
+            const numericColumns = columns.filter(c => 
+                rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c]))
+            );
+
+            if (numericColumns.length === 0) {
+                section.classList.add('hidden');
+                container.innerHTML = `<p class="text-gray-500 italic">${t.noNumericData}</p>`;
+                calculatedSummaryStats = {};
+                return;
+            }
+            
+            // Calculate and cache statistics
+            const stats = {};
+            numericColumns.forEach(col => {
+                const values = rawData.map(r => r[col]).filter(v => typeof v === 'number' && !isNaN(v));
+                stats[col] = calculateStats(values);
+            });
+            calculatedSummaryStats = stats;
+
+            const statLabels = t.statLabels;
+            const statKeys = ['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'];
+            
+            let html = `<table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-100 sticky-stat-label">${statLabels.statistic}</th>`;
+            numericColumns.forEach(col => { 
+                html += `<th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${col}</th>`; 
+            });
+            html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+            statKeys.forEach(key => {
+                html += `<tr><td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-700 sticky left-0 bg-white sticky-stat-label">${statLabels[key]}</td>`;
+                numericColumns.forEach(col => {
+                    const value = stats[col][key];
+                    const displayValue = isNaN(value) ? '-' : value.toFixed(3);
+                    html += `<td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 text-right">${displayValue}</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
+
+            container.innerHTML = html;
+            section.classList.remove('hidden');
+            downloadBtn.disabled = false;
+        }
+
+        /**
+         * Downloads the calculated summary statistics as a CSV file.
+         */
+        function downloadSummaryStatistics() {
+            const t = translations[currentLang];
+            const stats = calculatedSummaryStats;
+            const numericColumns = Object.keys(stats);
+            if (numericColumns.length === 0) { 
+                alert(t.downloadStatsError); 
+                return; 
+            }
+
+            const statLabels = t.statLabels;
+            const statKeys = ['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'];
+            let csv = [`"${statLabels.statistic}"`, ...numericColumns].join(',') + '\n';
+            statKeys.forEach(key => {
+                let row = [`"${statLabels[key]}"`];
+                numericColumns.forEach(col => {
+                    const value = stats[col][key];
+                    row.push(isNaN(value) ? '' : value.toFixed(3));
+                });
+                csv += row.join(',') + '\n';
+            });
+
+            // Create and trigger a download link
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const now = new Date();
+            const filename = `summary_stats_${now.toISOString().slice(0,10).replace(/-/g,"")}.csv`;
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        
+        /**
+         * Dynamically generates the UI controls for configuring the selected chart type.
+         */
+        function renderChartConfigUI() {
+            if (columns.length === 0) return;
+
+            const chartType = chartTypeSelect.value;
+            chartConfigArea.innerHTML = ''; 
+            downloadImageBtn.disabled = true; 
+            const t = translations[currentLang];
+            const labels = t.configLabels;
+            const numericColumns = columns.filter(c => 
+                rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c]))
+            );
+            
+            // Find the first numeric column for default selection
+            const defaultNumericCol = findFirstNumericColumn(rawData, columns); 
+
+            // Helper to create a <select> element
+            const createSelect = (id, labelText, options, isMultiple = false, size = 1, defaultValue = '') => {
+                const div = document.createElement('div');
+                div.className = 'space-y-1';
+                const label = Object.assign(document.createElement('label'), 
+                    { htmlFor: id, className: 'block text-sm font-medium text-gray-700', textContent: labelText });
+                const select = Object.assign(document.createElement('select'), 
+                    { id, className: 'w-full p-2 border border-gray-300 rounded-md' });
+                
+                if (isMultiple) { 
+                    select.multiple = true; 
+                    select.size = size; 
+                    select.classList.add('h-auto'); 
+                } else { 
+                    select.add(new Option(t.selectOptionDefault, '')); 
+                }
+
+                options.forEach(col => select.add(new Option(col, col)));
+                
+                // Set default value if provided and exists in options
+                if (defaultValue && select.querySelector(`option[value="${defaultValue}"]`)) {
+                    select.value = defaultValue;
+                }
+                
+                div.append(label, select);
+                chartConfigArea.appendChild(div);
+            };
+
+            // Helper to create an <input> element
+            const createInput = (id, labelText, type = 'text', defaultValue) => {
+                const div = document.createElement('div');
+                div.className = 'space-y-1';
+                const label = Object.assign(document.createElement('label'), 
+                    { htmlFor: id, className: 'block text-sm font-medium text-gray-700', textContent: labelText });
+                const input = Object.assign(document.createElement('input'), 
+                    { type, id, value: defaultValue, className: 'w-full p-2 border border-gray-300 rounded-md' });
+                div.append(label, input);
+                chartConfigArea.appendChild(div);
+            };
+
+            // Helper to create a group of radio buttons
+            const createRadioGroup = (name, labelText, options) => {
+                const div = document.createElement('div');
+                div.className = 'space-y-1';
+                const label = Object.assign(document.createElement('label'), 
+                    { className: 'block text-sm font-medium text-gray-700', textContent: labelText });
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'flex flex-wrap gap-4';
+
+                options.forEach(([value, text], index) => {
+                    const id = `${name}-${value}`;
+                    const radioDiv = document.createElement('div');
+                    radioDiv.className = 'flex items-center';
+                    const radio = Object.assign(document.createElement('input'), 
+                        { type: 'radio', name, id, value, className: 'h-4 w-4 text-blue-600 border-gray-300', checked: index === 0 });
+                    const radioLabel = Object.assign(document.createElement('label'), 
+                        { htmlFor: id, className: 'ml-2 block text-sm text-gray-700', textContent: text });
+                    radioDiv.append(radio, radioLabel);
+                    groupDiv.appendChild(radioDiv);
+                });
+
+                div.append(label, groupDiv);
+                chartConfigArea.appendChild(div);
+            };
+
+            // Generate UI based on the selected chart type
+            switch (chartType) {
+                case 'histogram':
+                    createSelect('column-selector-x', labels.xAxisData, numericColumns);
+                    createSelect('column-selector-color', labels.colorGroup, columns); 
+                    createInput('histogram-n-bins', labels.nBins, 'number', 10);
+                    break;
+                case 'box':
+                    // defaultNumericCol is passed as the 6th argument
+                    createSelect('column-selector-x', labels.yAxisData, numericColumns, false, 1, defaultNumericCol);
+                    createSelect('column-selector-group', labels.groupColumn, columns); 
+                    break;
+                case 'bar':
+                    createSelect('column-selector-x', labels.xAxisLabel, [t.indexOption, ...columns]);
+                    createSelect('column-selector-y', labels.yAxisValue, columns);
+                    break;
+                case 'line':
+                    createSelect('column-selector-x', labels.xAxisLabel, [t.indexOption, ...columns]);
+                    createSelect('column-selector-y', labels.yAxisMulti, numericColumns, true, 5);
+                    const hint = Object.assign(document.createElement('p'), {
+                        className: 'text-xs text-gray-500 mt-1',
+                        textContent: t.yAxisMultiSelectHint
+                    });
+                    chartConfigArea.appendChild(hint);
+                    break;
+                case 'scatter':
+                    createSelect('column-selector-x', labels.xAxisData, numericColumns);
+                    createSelect('column-selector-y', labels.yAxisData, numericColumns);
+                    createSelect('column-selector-color', labels.colorGroup, columns);
+                    createRadioGroup('regression-type', labels.regressionLine, Object.entries(labels.regression));
+                    break;
+                case 'pairplot':
+                    createSelect('column-selector-group', labels.colorGroup, columns);
+                    break;
+                case 'pareto':
+                    createSelect('pareto-category-col', labels.paretoCategory, columns);
+                    createSelect('pareto-value-col', labels.paretoValue, [labels.paretoValueOption, ...columns]);
+                    createInput('pareto-top-n', labels.paretoTopN, 'number', 10);
+                    chartConfigArea.insertAdjacentHTML('beforeend', `
+                        <div class="flex items-center">
+                            <input id="pareto-exclude-other" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            <label for="pareto-exclude-other" class="ml-2 block text-sm text-gray-700">${labels.paretoExcludeOther}</label>
+                        </div>`);
+                    break;
+                case 'xrs_control_chart':
+                    createSelect('xrs-data-col', labels.xrsData, columns);
+                    break;
+                default: 
+                    chartConfigArea.innerHTML = `<p class="text-red-500">${t.errorNotImplemented}</p>`;
+            }
+        }
+
+        // ===================================================================================
+        // Chart Drawing
+        // ===================================================================================
+
+        /**
+         * Main function to draw the selected chart. Acts as a router to specific drawing functions.
+         */
+        function drawChart() {
+            const chartType = chartTypeSelect.value;
+            const t = translations[currentLang];
+            chartContainer.innerHTML = ''; 
+            drawChartButton.disabled = true;
+            downloadImageBtn.disabled = true; 
+
+            try {
+                // Map chart types to their respective drawing functions
+                const drawFunctions = {
+                    'histogram': drawBasicChart, 'box': drawBasicChart, 'bar': drawBasicChart, 
+                    'line': drawBasicChart, 'scatter': drawBasicChart, 'pairplot': drawPairPlot, 
+                    'pareto': drawParetoChart, 'xrs_control_chart': drawXRsaChart
+                };
+                
+                if (drawFunctions[chartType]) {
+                    drawFunctions[chartType](chartType);
+                } else {
+                    chartContainer.innerHTML = `<p class="text-red-500 text-center pt-20">${t.errorNotImplemented}</p>`;
+                }
+                downloadImageBtn.disabled = false;
+            } catch (error) {
+                console.error('Chart drawing error:', error);
+                chartContainer.innerHTML = `<div class="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center mt-4">
+                    <p class="font-bold">${t.errorDrawingChart}</p>
+                    <p class="text-sm">${error.message || t.errorCheckSettings}</p>
+                </div>`;
+                downloadImageBtn.disabled = true; 
+            } finally {
+                drawChartButton.disabled = false;
+            }
+        }
+        
+        /**
+         * Helper to get all selected values from a multi-select dropdown.
+         * @param {string} selectId - The ID of the select element.
+         * @returns {Array<string>} An array of selected values.
+         */
+        function getSelectedValues(selectId) {
+            const select = document.getElementById(selectId);
+            if (!select) return [];
+            return Array.from(select.selectedOptions).map(option => option.value);
+        }
+
+        /**
+         * Draws basic charts like histogram, box, bar, line, and scatter.
+         * @param {string} type - The type of basic chart to draw.
+         */
+        function drawBasicChart(type) {
+            const t = translations[currentLang];
+            
+            // Get values from UI controls
+            const xCol = document.getElementById('column-selector-x')?.value;
+            const yCols = getSelectedValues('column-selector-y');
+            const groupCol = document.getElementById('column-selector-group')?.value; 
+            const colorCol = document.getElementById('column-selector-color')?.value; 
+            const regressionType = document.querySelector('input[name="regression-type"]:checked')?.value || 'none';
+            
+            const firstYCol = yCols[0] || '';
+            const xIsIndex = (type === 'bar' || type === 'line') && xCol === t.indexOption;
+
+            // --- Input Validation ---
+            if (!xCol && type !== 'box') throw new Error(t.errorMissingData);
+            if ((type === 'bar' || type === 'line') && xCol === '') throw new Error(t.errorMissingX);
+            if ((type === 'bar' || type === 'line' || type === 'scatter') && yCols.length === 0) throw new Error(t.errorMissingY);
+            if (type === 'box' && !xCol) throw new Error(t.errorBoxData);
+
+            // --- Chart Title Generation ---
+            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const defaultTitleX = xIsIndex ? 'Index' : (xCol || '');
+            const defaultTitleY = firstYCol ? ` vs ${firstYCol}` : '';
+            const chartTitle = chartTitleInput || `${defaultTitleX}${defaultTitleY} ${t.chartTypes[type]}`;
+            
+            let traces = [];
+            const layout = { 
+                title: chartTitle, 
+                margin: { t: 40, b: 40, l: 40, r: 20 }, 
+                height: 550, 
+                hovermode: 'closest',
+                xaxis: { title: xIsIndex ? 'Index' : (xCol || groupCol || 'Data'), automargin: true },
+                yaxis: { title: yCols.length > 1 ? 'Value' : firstYCol, automargin: true } 
+            };
+
+            // --- Data Grouping ---
+            let groupedData = { 'all': rawData };
+            let groupKeys = ['all'];
+            if ((type === 'box' && groupCol) || ((type === 'histogram' || type === 'scatter') && colorCol)) {
+                const col = groupCol || colorCol;
+                groupedData = rawData.reduce((acc, row) => {
+                    const key = String(row[col] ?? '(null)');
+                    (acc[key] = acc[key] || []).push(row);
+                    return acc;
+                }, {});
+                groupKeys = Object.keys(groupedData).sort();
+                // For scatter plots, color grouping happens within the trace generation
+                if (type === 'scatter') { 
+                    groupKeys = ['all']; 
+                    groupedData = { 'all': rawData }; 
+                }
+            }
+            
+            // --- Trace Generation ---
+            groupKeys.forEach(key => {
+                const groupRows = groupedData[key];
+                const groupName = key === 'all' ? '' : key;
+                const xData = xIsIndex ? groupRows.map((_, i) => i + 1) : (xCol ? groupRows.map(d => d[xCol]) : null);
+
+                switch (type) {
+                    case 'box':
+                        const yValuesBox = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                        traces.push({ y: yValuesBox, x: groupCol ? Array(groupRows.length).fill(key) : undefined, boxpoints: 'all', type: 'box', name: groupName });
+                        layout.yaxis.title = xCol; 
+                        layout.xaxis.title = groupCol || '';
+                        break;
+                    case 'histogram':
+                        const xValues = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                        const nBins = parseInt(document.getElementById('histogram-n-bins')?.value) || 10;
+                        traces.push({ x: xValues, type: 'histogram', name: groupName, opacity: 0.7, nbinsx: nBins });
+                        layout.barmode = 'overlay'; 
+                        layout.yaxis.title = 'Frequency';
+                        break;
+                    case 'bar':
+                        traces.push({ x: xData, y: groupRows.map(d => d[firstYCol]), type: 'bar', name: firstYCol });
+                        break;
+                    case 'line':
+                        yCols.forEach(yCol => traces.push({ x: xData, y: groupRows.map(d => d[yCol]), mode: 'lines', type: 'scatter', name: yCol }));
+                        layout.showlegend = yCols.length > 1; 
+                        layout.yaxis.title = 'Value';
+                        break;
+                    case 'scatter':
+                        const colorGroups = groupRows.reduce((acc, d) => {
+                            const cKey = colorCol ? String(d[colorCol] ?? '(null)') : 'default';
+                            (acc[cKey] = acc[cKey] || { x: [], y: [] }).x.push(d[xCol]);
+                            acc[cKey].y.push(d[firstYCol]);
+                            return acc;
+                        }, {});
+
+                        Object.keys(colorGroups).forEach(gKey => {
+                            traces.push({ x: colorGroups[gKey].x, y: colorGroups[gKey].y, mode: 'markers', type: 'scatter', name: gKey });
+                        });
+                        
+                        layout.showlegend = !!colorCol; 
+                        layout.yaxis.title = firstYCol;
+                        
+                        // Add regression line if selected
+                        if (regressionType === 'linear') {
+                            const xVals = rawData.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                            const yVals = rawData.map(d => d[firstYCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                            if (xVals.length > 1) {
+                                const n = xVals.length;
+                                const sumX = xVals.reduce((a, b) => a + b, 0), sumY = yVals.reduce((a, b) => a + b, 0);
+                                const sumXY = xVals.reduce((s, x, i) => s + x * yVals[i], 0), sumXX = xVals.reduce((s, x) => s + x * x, 0);
+                                const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                                const a = (sumY / n) - b * (sumX / n);
+                                const xMin = Math.min(...xVals), xMax = Math.max(...xVals);
+                                traces.push({ x: [xMin, xMax], y: [a + b * xMin, a + b * xMax], mode: 'lines', type: 'scatter', line: { color: 'red' }, name: labels.regression.linear });
+                            }
+                        }
+                        break;
+                }
+            });
+
+            if (type === 'bar' || type === 'line') layout.xaxis.type = xIsIndex ? 'linear' : 'category';
+            Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
+        }
+
+        /**
+         * Draws a pair plot (scatter plot matrix).
+         */
+        function drawPairPlot() {
+            const groupCol = document.getElementById('column-selector-group')?.value;
+            const numericColumns = columns.filter(c => rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c])));
+            
+            if (numericColumns.length < 2) {
+                throw new Error(translations[currentLang].errorPairPlot);
+            }
+
+            const dimensions = numericColumns.map(col => ({ 
+                label: col, 
+                values: rawData.map(d => d[col]) 
+            }));
+
+            const marker = { size: 4, opacity: 0.8 };
+            if (groupCol) {
+                marker.color = rawData.map(d => String(d[groupCol] ?? '(null)'));
+                marker.showscale = true;
+            }
+
+            const trace = { 
+                type: 'splom', 
+                dimensions, 
+                showlowerhalf: true, 
+                showupperhalf: false, 
+                marker, 
+                diagonal: { visible: false } 
+            };
+            
+            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const chartTitle = chartTitleInput || `${translations[currentLang].chartTypes.pairplot}${groupCol ? ` - Group: ${groupCol}` : ''}`;
+            
+            const layout = { title: chartTitle, height: 700, autosize: true, hovermode: 'closest' };
+            Plotly.newPlot(chartContainer, [trace], layout, { responsive: true });
+        }
+
+        /**
+         * Draws a Pareto chart.
+         */
+        function drawParetoChart() {
+            const categoryCol = document.getElementById('pareto-category-col').value;
+            const valueColRaw = document.getElementById('pareto-value-col').value;
+            const topN = parseInt(document.getElementById('pareto-top-n').value) || 10;
+            const excludeOther = document.getElementById('pareto-exclude-other').checked;
+            const t = translations[currentLang];
+            
+            if (!categoryCol) throw new Error(t.errorParetoCategory);
+
+            const valueCol = valueColRaw === t.configLabels.paretoValueOption ? null : valueColRaw;
+            
+            // Aggregate data by category
+            const aggregatedData = rawData.reduce((acc, row) => {
+                const category = row[categoryCol];
+                const value = valueCol ? (typeof row[valueCol] === 'number' ? row[valueCol] : 0) : 1;
+                if (category != null) {
+                    acc[String(category)] = (acc[String(category)] || 0) + value;
+                }
+                return acc;
+            }, {});
+
+            // Sort data by value in descending order
+            let sorted = Object.entries(aggregatedData)
+                .sort(([,a],[,b]) => b - a)
+                .map(([category, value]) => ({category, value}));
+            
+            // Handle "Top N" and "Other" categories
+            let displayData = sorted.slice(0, topN);
+            let otherValue = sorted.slice(topN).reduce((sum, item) => sum + item.value, 0);
+            if (otherValue > 0 && !excludeOther) {
+                displayData.push({ category: 'Other', value: otherValue });
+            }
+
+            // Calculate cumulative ratio
+            const total = displayData.reduce((s, i) => s + i.value, 0);
+            let cumulative = 0;
+            displayData.forEach(d => { 
+                cumulative += d.value; 
+                d.cumulativeRatio = (cumulative / total) * 100; 
+            });
+            
+            // --- MODIFICATION START ---
+            // Create numeric indices for positioning, and category labels for display.
+            const x_indices = displayData.map((_, i) => i);
+            const categories = displayData.map(d => d.category);
+            const values = displayData.map(d => d.value);
+            const ratios = displayData.map(d => d.cumulativeRatio);
+
+            // The bar trace uses the integer indices, which will center the bars.
+            const barTrace = { x: x_indices, y: values, type: 'bar', name: 'Value', yaxis: 'y1' };
+
+            // The line trace indices are offset to align with the right edge of the bars.
+            // A standard bar at index `i` spans from `i-0.4` to `i+0.4`. We shift the marker to `i+0.4`.
+            const line_x_indices = x_indices.map(i => i + 0.4);
+            const lineTrace = { x: line_x_indices, y: ratios, type: 'scatter', mode: 'lines+markers', name: 'Cumulative %', yaxis: 'y2' };
+            
+            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const chartTitle = chartTitleInput || `${categoryCol} ${t.chartTypes.pareto}`;
+            
+            const layout = { 
+                title: chartTitle, 
+                height: 550, 
+                // Use a linear axis but with category labels for ticks.
+                xaxis: { 
+                    tickvals: x_indices,
+                    ticktext: categories,
+                    // Adjust range to ensure the last marker (at n-1 + 0.4) is visible.
+                    range: [-0.75, x_indices.length - 0.5]
+                },
+                yaxis: { title: 'Value' },
+                // Increase range slightly to prevent 100% marker from touching the top border
+                yaxis2: { title: 'Cumulative Ratio (%)', overlaying: 'y', side: 'right', range: [0, 105] },
+                // Add a horizontal line at 80% for Pareto analysis
+                shapes: [{
+                    type: 'line',
+                    xref: 'paper', // Use 'paper' to span the whole plot width
+                    yref: 'y2',    // Refer to the secondary y-axis
+                    x0: 0,
+                    y0: 80,
+                    x1: 1,
+                    y1: 80,
+                    line: {
+                        color: 'red',
+                        width: 2,
+                        dash: 'dot'
+                    }
+                }]
+            };
+            Plotly.newPlot(chartContainer, [barTrace, lineTrace], layout, { responsive: true });
+            // --- MODIFICATION END ---
+        }
+
+        /**
+         * Draws an X-bar and R-s (X-Rs) control chart.
+         */
+        function drawXRsaChart() {
+            const dataCol = document.getElementById('xrs-data-col').value;
+            const t = translations[currentLang];
+            if (!dataCol) throw new Error(t.errorMissingData);
+
+            const values = rawData.map(r => r[dataCol]).filter(v => typeof v === 'number' && !isNaN(v));
+            if (values.length < 2) throw new Error(t.errorXRData);
+            
+            // Calculate Moving Range (Rs)
+            const indices = values.map((_, i) => i + 1);
+            const MR = [null, ...values.slice(1).map((v, i) => Math.abs(v - values[i]))];
+            const validMR = MR.filter(v => v != null);
+            if (validMR.length === 0) throw new Error(t.errorMRData);
+            
+            // Calculate center lines
+            const X_bar = values.reduce((s, v) => s + v, 0) / values.length;
+            const MR_bar = validMR.reduce((s, v) => s + v, 0) / validMR.length;
+            const { E2, D4 } = CONTROL_CHART_COEFFICIENTS[2];
+
+            // Calculate control limits
+            const UCL_X = X_bar + E2 * MR_bar, CL_X = X_bar, LCL_X = X_bar - E2 * MR_bar;
+            const UCL_MR = D4 * MR_bar, CL_MR = MR_bar, LCL_MR = 0;
+
+            // Define traces for X chart
+            const xTraces = [
+                { x: indices, y: values, mode: 'lines', name: 'X' },
+                { x: indices, y: Array(values.length).fill(UCL_X), mode: 'lines', name: 'UCL (X)', line: { dash: 'dash', color: 'red' } },
+                { x: indices, y: Array(values.length).fill(CL_X), mode: 'lines', name: 'CL (X)', line: { dash: 'dot', color: 'black' } },
+                { x: indices, y: Array(values.length).fill(LCL_X), mode: 'lines', name: 'LCL (X)', line: { dash: 'dash', color: 'red' } }
+            ];
+            // Define traces for Rs chart
+            const mrTraces = [
+                { x: indices, y: MR, mode: 'lines', name: 'Rs', yaxis: 'y2', xaxis: 'x2'},
+                { x: indices, y: Array(values.length).fill(UCL_MR), mode: 'lines', name: 'UCL (Rs)', line: { dash: 'dash', color: 'red' }, yaxis: 'y2', xaxis: 'x2'},
+                { x: indices, y: Array(values.length).fill(CL_MR), mode: 'lines', name: 'CL (Rs)', line: { dash: 'dot', color: 'black' }, yaxis: 'y2', xaxis: 'x2'},
+                { x: indices, y: Array(values.length).fill(LCL_MR), mode: 'lines', name: 'LCL (Rs)', line: { dash: 'dash', color: 'red' }, yaxis: 'y2', xaxis: 'x2'}
+            ];
+
+            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const chartTitle = chartTitleInput || `${dataCol} ${t.chartTypes.xrs_control_chart}`;
+            
+            const layout = { 
+                title: chartTitle, 
+                height: 800, 
+                grid: { rows: 2, columns: 1, pattern: 'independent' },
+                yaxis: { title: 'X (Value)' }, 
+                yaxis2: { title: 'Rs (Moving Range)' }, 
+                showlegend: false 
+            };
+
+            Plotly.newPlot(chartContainer, [...xTraces, ...mrTraces], layout, { responsive: true });
+        }
+        
+        /**
+         * Downloads the currently displayed chart as a PNG image.
+         */
+        function downloadChartAsImage() {
+            const now = new Date();
+            const filename = `chart_${now.toISOString().slice(0,10).replace(/-/g,"")}.png`;
+            
+            // Check if chart data exists
+            if (!chartContainer || !chartContainer.data) {
+                 alert(translations[currentLang].downloadImageError);
+                 return;
+            }
+
+            // Use Plotly.toImage to get a data URL of the chart
+            Plotly.toImage(chartContainer, { format: 'png', width: 1200, height: 750 })
+                .then(function(imageDataUrl) {
+                    // Create a temporary link to trigger the download
+                    const link = document.createElement('a');
+                    link.href = imageDataUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }).catch(err => {
+                    console.error('Image download error:', err);
+                    alert(translations[currentLang].downloadImageError);
+                });
+        }
+
+        // ===================================================================================
+        // Application Startup
+        // ===================================================================================
+        initializeApp();
+    </script>
+</body>
+</html>

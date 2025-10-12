@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>かんたんグラフ作成アプリ (HTML+Plotly)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        /* カスタムスタイル: サイドバーの幅とメインコンテンツの調整 */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+        }
+        .main-content {
+            flex-grow: 1;
+        }
+        /* Plotlyの描画領域の高さ設定 */
+        #chart-container {
+            min-height: 600px;
+        }
+        /* スクロールバーのスタイルを調整して見やすく */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background-color: #f7f7f7; /* light gray */
+        }
+
+        /* ======================================= */
+        /* === 印刷用スタイル (Print Styles) === */
+        /* ======================================= */
+        @media print {
+            /* 1. サイドバー（コントロールパネル）を非表示にする */
+            .sidebar {
+                display: none !important;
+            }
+
+            /* 2. メインコンテンツを画面全体に広げる (flex設定を解除) */
+            .main-container {
+                display: block !important; /* flexを解除 */
+            }
+
+            /* 3. メインコンテンツとグラフコンテナの幅を100%にする */
+            .main-content, #chart-area {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important; /* パディングを解除 */
+                margin: 0 !important; /* マージンを解除 */
+            }
+            
+            /* 4. グラフコンテナの高さ制限を解除し、グラフ要素が縦に広がるようにする */
+            #chart-container {
+                min-height: auto !important;
+                height: auto !important;
+                width: 100% !important;
+                /* 印刷時のグラフの見栄えを良くするため、高さを指定することも可能ですが、
+                   ここでは自動調整に任せ、Plotlyの再描画に期待します。 */
+            }
+
+            /* 5. ヘッダーやフッター、ボタン類など不要なUI要素を非表示にする */
+            header, button, .hidden-print {
+                display: none !important;
+            }
+
+            /* 6. テキストの背景色や影を解除し、インクを節約する */
+            body {
+                background-color: white !important;
+                color: black !important;
+            }
+
+            /* Tailwind CSSのシャドウや角丸を解除 (必要な場合) */
+            .shadow-lg, .rounded-xl {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+    <!-- ヘッダー -->
+    <header class="bg-indigo-600 shadow-md p-4 flex items-center justify-between print:hidden">
+        <h1 class="text-xl font-bold text-white">かんたんグラフ作成アプリ</h1>
+        <div class="space-x-2">
+            <button onclick="downloadImage()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md text-sm">
+                グラフ画像をダウンロード
+            </button>
+            <button onclick="window.print()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md text-sm">
+                印刷プレビュー
+            </button>
+        </div>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex flex-col lg:flex-row main-container">
+        
+        <!-- サイドバー (コントロールパネル) -->
+        <div class="sidebar bg-white shadow-xl p-4 lg:p-6 space-y-6 overflow-y-auto max-h-screen lg:max-h-full print:hidden">
+            <h2 class="text-lg font-semibold text-gray-800 border-b pb-2">データと設定</h2>
+
+            <!-- データ入力/アップロード -->
+            <div class="space-y-3">
+                <label for="file-upload" class="block text-sm font-medium text-gray-700">1. CSV/Excelファイルを選択</label>
+                <input type="file" id="file-upload" accept=".csv, .xlsx" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100">
+                <button onclick="processFile()" id="process-button" disabled class="w-full bg-indigo-400 text-white py-2 rounded-lg text-sm font-semibold transition duration-150 disabled:opacity-50">
+                    データを読み込む
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <label for="data-input" class="block text-sm font-medium text-gray-700">2. または、データを直接入力 (CSV形式)</label>
+                <textarea id="data-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 text-sm font-mono" placeholder="例:&#10;項目,値1,値2&#10;A,10,25&#10;B,30,15"></textarea>
+                <button onclick="processDataInput()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-semibold transition duration-150 shadow-md">
+                    入力データでグラフ作成
+                </button>
+            </div>
+
+            <div class="space-y-3 pt-4 border-t">
+                <h3 class="text-md font-semibold text-gray-800">3. グラフ設定</h3>
+                
+                <label for="chart-type" class="block text-sm font-medium text-gray-700">グラフの種類</label>
+                <select id="chart-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm" onchange="drawChart()">
+                    <option value="bar">棒グラフ</option>
+                    <option value="line">折れ線グラフ</option>
+                    <option value="scatter">散布図</option>
+                    <option value="pie">円グラフ</option>
+                </select>
+
+                <label for="x-axis-col" class="block text-sm font-medium text-gray-700">X軸 (項目名) カラム</label>
+                <select id="x-axis-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm" onchange="drawChart()">
+                    <!-- オプションはJSで動的に追加 -->
+                </select>
+
+                <label for="y-axis-cols" class="block text-sm font-medium text-gray-700">Y軸 (数値) カラム</label>
+                <select id="y-axis-cols" multiple size="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm" onchange="drawChart()">
+                    <!-- オプションはJSで動的に追加 -->
+                </select>
+
+                <label for="title-input" class="block text-sm font-medium text-gray-700">グラフタイトル</label>
+                <input type="text" id="title-input" value="データ分析グラフ" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm" oninput="drawChart()">
+            </div>
+            
+        </div>
+
+        <!-- メインコンテンツ (グラフ描画エリア) -->
+        <main class="main-content p-4 lg:p-8 flex flex-col items-center">
+            
+            <div id="chart-area" class="w-full max-w-7xl bg-white p-6 lg:p-8 rounded-xl shadow-lg border border-gray-200">
+                <div id="chart-container" class="w-full">
+                    <!-- Plotly.jsがここにグラフを描画 -->
+                    <p class="text-center text-gray-500 py-20">左のサイドバーからファイルを選択またはデータを入力し、「データを読み込む」または「入力データでグラフ作成」を押して下さい。</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script type="module">
+        // グローバル変数
+        let parsedData = []; // 読み込んだCSV/Excelの全データ (ヘッダー含む)
+        let headerRow = [];  // ヘッダー行のみ
+        let dataRows = [];   // データ行のみ
+        let chartContainer = null; // PlotlyグラフコンテナのDOM要素
+
+        // 初期化: グラフコンテナを取得
+        document.addEventListener('DOMContentLoaded', () => {
+            chartContainer = document.getElementById('chart-container');
+        });
+
+        // =======================================
+        // === ファイル/データ処理関数 ===
+        // =======================================
+
+        /**
+         * ファイルアップロード処理（CSV/XLSX対応）
+         */
+        document.getElementById('file-upload').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const processButton = document.getElementById('process-button');
+            if (file) {
+                processButton.disabled = false;
+                processButton.textContent = `${file.name} を読み込む`;
+            } else {
+                processButton.disabled = true;
+                processButton.textContent = 'データを読み込む';
+            }
+        });
+
+        function processFile() {
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('ファイルを選択してください。');
+                return;
+            }
+
+            const fileName = file.name.toLowerCase();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = e.target.result;
+                if (fileName.endsWith('.csv')) {
+                    Papa.parse(data, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            handleParsedData(results.data);
+                        },
+                        error: function(error) {
+                            console.error("CSV解析エラー:", error);
+                            alert('CSVファイルの解析に失敗しました。形式を確認してください。');
+                        }
+                    });
+                } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+                    handleParsedData(json);
+                }
+            };
+
+            if (fileName.endsWith('.csv')) {
+                reader.readAsText(file);
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                reader.readAsBinaryString(file);
+            }
+        }
+
+        /**
+         * テキストエリアからのデータ入力処理
+         */
+        function processDataInput() {
+            const dataInput = document.getElementById('data-input').value;
+            if (!dataInput.trim()) {
+                alert('データを入力してください。');
+                return;
+            }
+
+            Papa.parse(dataInput, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data.length === 0 || Object.keys(results.data[0]).length < 2) {
+                        alert('入力データが不完全です。ヘッダーとデータが揃っているか確認してください。');
+                        return;
+                    }
+                    handleParsedData(results.data);
+                },
+                error: function(error) {
+                    console.error("テキストデータ解析エラー:", error);
+                    alert('入力データの解析に失敗しました。CSV形式（カンマ区切り、一行目がヘッダー）を確認してください。');
+                }
+            });
+        }
+
+        /**
+         * 解析済みデータを処理し、UIを更新する
+         * @param {Array<Object>} data - ヘッダーをキーとしたデータの配列
+         */
+        function handleParsedData(data) {
+            if (data.length === 0) {
+                alert('データが見つかりませんでした。');
+                return;
+            }
+
+            // データをクリーンアップ（空のキーを持つオブジェクトを除去）
+            parsedData = data.filter(item => Object.keys(item).length > 0);
+            
+            // ヘッダーとデータ行を分離
+            headerRow = Object.keys(parsedData[0]);
+            dataRows = parsedData.map(row => {
+                const newRow = {};
+                for (const key of headerRow) {
+                    // 数値に変換可能なものは数値に変換
+                    let value = row[key];
+                    if (value !== null && value !== undefined && value.toString().trim() !== '') {
+                        const num = Number(value);
+                        newRow[key] = isNaN(num) ? value : num;
+                    } else {
+                        newRow[key] = value; // そのまま保持 (null, undefined, 空文字など)
+                    }
+                }
+                return newRow;
+            });
+            
+            updateColumnSelectors();
+            drawChart();
+        }
+
+        /**
+         * カラム選択ドロップダウンを更新する
+         */
+        function updateColumnSelectors() {
+            const xAxisSelect = document.getElementById('x-axis-col');
+            const yAxisSelect = document.getElementById('y-axis-cols');
+
+            // 既存のオプションをクリア
+            xAxisSelect.innerHTML = '';
+            yAxisSelect.innerHTML = '';
+
+            if (headerRow.length === 0) {
+                return;
+            }
+
+            // カラムのオプションを作成
+            headerRow.forEach((col, index) => {
+                const optionX = document.createElement('option');
+                optionX.value = col;
+                optionX.textContent = col;
+                xAxisSelect.appendChild(optionX);
+
+                const optionY = document.createElement('option');
+                optionY.value = col;
+                optionY.textContent = col;
+                yAxisSelect.appendChild(optionY);
+
+                // 最初のカラムをX軸のデフォルトとして選択
+                if (index === 0) {
+                    optionX.selected = true;
+                }
+                // それ以外の数値列（ここでは単純に2番目以降）をY軸のデフォルトとして選択
+                if (index > 0 && index < 3) {
+                    optionY.selected = true;
+                }
+            });
+        }
+
+        // =======================================
+        // === グラフ描画関数 ===
+        // =======================================
+
+        /**
+         * グラフを描画する
+         */
+        function drawChart() {
+            if (dataRows.length === 0 || headerRow.length < 2) {
+                // データがない場合は、初期メッセージを表示
+                Plotly.purge(chartContainer); // 既存のグラフを削除
+                chartContainer.innerHTML = '<p class="text-center text-gray-500 py-20">データを読み込んで設定を完了すると、ここにグラフが表示されます。</p>';
+                return;
+            }
+
+            const chartType = document.getElementById('chart-type').value;
+            const title = document.getElementById('title-input').value;
+            const xAxisCol = document.getElementById('x-axis-col').value;
+            const yAxisCols = Array.from(document.getElementById('y-axis-cols').selectedOptions).map(option => option.value);
+
+            if (!xAxisCol || yAxisCols.length === 0) {
+                // X軸またはY軸が未選択の場合は描画しない
+                Plotly.purge(chartContainer); 
+                chartContainer.innerHTML = '<p class="text-center text-gray-500 py-20">X軸とY軸のカラムを選択してください。</p>';
+                return;
+            }
+            
+            // X軸のデータ (項目名)
+            const xData = dataRows.map(row => row[xAxisCol]);
+
+            // Y軸のデータ（複数のトレースをサポート）
+            let data = [];
+            let layout = {};
+
+            if (chartType === 'pie') {
+                // 円グラフの場合の特別な処理
+                const valueCol = yAxisCols[0]; // 最初のY軸カラムを値として使用
+                const values = dataRows.map(row => row[valueCol]).filter(v => typeof v === 'number');
+                const labels = xData.filter((_, i) => typeof dataRows[i][valueCol] === 'number');
+
+                data = [{
+                    labels: labels,
+                    values: values,
+                    type: chartType,
+                    hoverinfo: 'label+percent+value',
+                    textinfo: 'percent',
+                    marker: {
+                        colors: Plotly.d3.scale.category10()
+                    }
+                }];
+                
+                layout = {
+                    title: title,
+                    height: 600,
+                    margin: { t: 50, b: 50, l: 50, r: 50 },
+                    showlegend: true
+                };
+
+            } else {
+                // 棒グラフ、折れ線グラフ、散布図の処理
+                yAxisCols.forEach(col => {
+                    const yData = dataRows.map(row => row[col]);
+                    data.push({
+                        x: xData,
+                        y: yData,
+                        name: col,
+                        type: chartType,
+                        mode: (chartType === 'scatter' || chartType === 'line') ? 'lines+markers' : undefined,
+                        marker: {
+                            line: {
+                                width: chartType === 'bar' ? 1 : 0
+                            }
+                        }
+                    });
+                });
+
+                layout = {
+                    title: title,
+                    xaxis: {
+                        title: xAxisCol,
+                        automargin: true,
+                        showgrid: false
+                    },
+                    yaxis: {
+                        title: yAxisCols.join(', '),
+                        automargin: true,
+                        gridcolor: '#e0e0e0'
+                    },
+                    barmode: (chartType === 'bar') ? 'group' : undefined, // 棒グラフの重ね方を指定
+                    height: 600,
+                    margin: { t: 50, b: 100, l: 80, r: 50 },
+                    hovermode: 'closest',
+                    responsive: true, // レスポンシブ対応
+                };
+            }
+            
+            // グラフを描画または再描画
+            Plotly.newPlot(chartContainer, data, layout, {
+                displayModeBar: true, // グラフ上部のメニューバーを表示
+                responsive: true // コンテナサイズに合わせて自動調整
+            });
+
+            // 印刷時のグラフサイズを調整するために、印刷イベント時にPlotlyを再レイアウト
+            window.addEventListener('beforeprint', () => {
+                // 印刷前にグラフコンテナがフル幅になったことを考慮して再描画
+                // Plotlyのresponsive: trueが効くようにresizeイベントを発火させます
+                // 遅延させないとDOMの幅変更が反映されないことがあるため、setTimeoutを使用します
+                setTimeout(() => {
+                    Plotly.relayout(chartContainer, {
+                        width: document.getElementById('chart-area').offsetWidth,
+                        height: 600 // 印刷時は一定の高さを持たせる
+                    });
+                }, 50); 
+            });
+
+            // 印刷終了後のレイアウトを元に戻す処理
+            window.addEventListener('afterprint', () => {
+                // 印刷後に元のサイドバーがある状態のレイアウトに戻します
+                Plotly.relayout(chartContainer, {
+                    width: document.getElementById('chart-area').offsetWidth,
+                    height: 600
+                });
+            });
+
+        }
+
+        // =======================================
+        // === 画像ダウンロード関数 ===
+        // =======================================
+
+        function downloadImage() {
+            const now = new Date();
+            const filename = `chart_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.png`;
+
+            // グラフが描画されているか確認 (chartContainerはグローバル変数)
+            if (!chartContainer || !chartContainer.data) {
+                 console.error('画像ダウンロードエラー: グラフデータが見つかりません。');
+                 // カスタムモーダルメッセージ
+                 showCustomMessage('グラフ画像のダウンロード中にエラーが発生しました。グラフが正しく描画されているか確認してください。');
+                 return;
+            }
+
+            // Plotly.toImage で Data URL を取得 (印刷用とは異なり、高解像度で指定)
+            Plotly.toImage(chartContainer, {
+                format: 'png',
+                width: 1200,
+                height: 750 // 既存の設定を維持
+            }).then(function(imageDataUrl) {
+                // 一時的なリンク要素を作成してダウンロードを実行
+                const link = document.createElement('a');
+                link.href = imageDataUrl;
+                link.download = filename;
+                
+                // ダウンロードを実行するために一時的にDOMに追加
+                document.body.appendChild(link); 
+                link.click();
+                
+                // リンク要素を削除
+                document.body.removeChild(link);
+            }).catch(err => {
+                console.error('画像ダウンロードエラー:', err);
+                // カスタムモーダルメッセージ
+                showCustomMessage('グラフ画像のダウンロード中にエラーが発生しました。詳細はコンソールを確認してください。');
+            });
+        }
+
+        // =======================================
+        // === カスタムメッセージ表示関数 (alertの代替) ===
+        // =======================================
+
+        function showCustomMessage(message) {
+            // シンプルなモーダルを動的に作成
+            let modal = document.getElementById('custom-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'custom-modal';
+                modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full space-y-4">
+                        <h3 class="text-lg font-bold text-red-600">エラー/通知</h3>
+                        <p id="modal-message" class="text-gray-700"></p>
+                        <button onclick="document.getElementById('custom-modal').remove()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition duration-150">閉じる</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            document.getElementById('modal-message').textContent = message;
+        }
+
+    </script>
+
+</body>
+</html>
