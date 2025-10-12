@@ -77,10 +77,10 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 
 **HakoHigeKun-R** is built on robust, open-source web technologies:
 
-^ [Tailwind CSS](https://tailwindcss.com/): For clean, modern styling.
-^ [Plotly.js](https://plotly.com/javascript/): The powerful engine for creating professional, interactive charts.
-^ [PapaParse](https://www.papaparse.com/): Fast and reliable CSV parsing.
-^ [SheetJS/xlsx](https://sheetjs.com/): For robust Excel file (XLSX) parsing.
+- [Tailwind CSS](https://tailwindcss.com/): For clean, modern styling.
+- [Plotly.js](https://plotly.com/javascript/): The powerful engine for creating professional, interactive charts.
+- [PapaParse](https://www.papaparse.com/): Fast and reliable CSV parsing.
+- [SheetJS/xlsx](https://sheetjs.com/): For robust Excel file (XLSX) parsing.
 
 
 ## License
