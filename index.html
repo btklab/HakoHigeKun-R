@@ -278,6 +278,8 @@
                     xAxisData: "Data Column (X-axis)",
                     yAxisData: "Data Column (Y-axis)",
                     groupColumn: "Group Column (X-axis) (optional)",
+                    groupColumns: "Group Columns (X-axis) (optional)",
+                    multiGroupCheckbox: "Specify multiple columns",
                     colorGroup: "Color/Group Column (optional)",
                     nBins: "Number of Bins (N_bins)",
                     yAxisMulti: "Y-axis (Value) - Multi-select",
@@ -286,6 +288,7 @@
                     regressionLine: "Regression Line (optional)",
                     regression: { none: "None", linear: "Linear", poly: "Polynomial (2nd)" },
                     paretoCategory: "Category Column",
+                    paretoCategories: "Category Columns",
                     paretoValue: "Value Column (optional)",
                     paretoValueOption: "(Count by rows)",
                     paretoTopN: "Show Top N Items",
@@ -358,6 +361,8 @@
                     xAxisData: "データ列 (X軸)",
                     yAxisData: "データ列 (Y軸)",
                     groupColumn: "グループ列 (X軸) (オプション)",
+                    groupColumns: "グループ列 (X軸) (オプション)",
+                    multiGroupCheckbox: "複数列を指定",
                     colorGroup: "グループ列 (色分け) (オプション)",
                     nBins: "ビンの数 (N_bins)",
                     yAxisMulti: "Y軸 (値) - 複数選択可能",
@@ -366,6 +371,7 @@
                     regressionLine: "回帰線 (オプション)",
                     regression: { none: "なし", linear: "線形", poly: "多項式 (2次)" },
                     paretoCategory: "カテゴリ列",
+                    paretoCategories: "カテゴリ列",
                     paretoValue: "集計値列 (オプション)",
                     paretoValueOption: "(行数で集計)",
                     paretoTopN: "上位N件表示",
@@ -380,6 +386,7 @@
             }
         };
         let currentLang = 'ja';
+        let groupingActive = false;
 
         /**
          * Sets the application language and updates the UI.
@@ -1103,6 +1110,28 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             return null;
         }
 
+        /**
+         * Checks if all specified columns are predominantly numeric.
+         * @param {Array<string>} colsToCheck - Array of column names to check.
+         * @returns {boolean} True if all columns are considered numeric.
+         */
+        function areColumnsNumeric(colsToCheck) {
+            if (!colsToCheck || colsToCheck.length === 0) return false;
+
+            for (const col of colsToCheck) {
+                const values = rawData.map(r => r[col]).filter(v => v != null); // Get non-null values
+                if (values.length === 0) return false; // Empty column is not numeric
+
+                const numericCount = values.filter(v => typeof v === 'number' && !isNaN(v)).length;
+                
+                // If less than 80% of non-null values are numeric, treat it as non-numeric
+                if ((numericCount / values.length) < 0.8) { 
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // ===================================================================================
         // UI Rendering Functions
         // ===================================================================================
@@ -1286,7 +1315,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const defaultNumericCol = findFirstNumericColumn(rawData, columns); 
 
             // Helper to create a <select> element
-            const createSelect = (id, labelText, options, isMultiple = false, size = 1, defaultValue = '') => {
+            const createSelect = (id, labelText, options, isMultiple = false, size = 1, defaultValue = '', parentElement = chartConfigArea) => {
                 const div = document.createElement('div');
                 div.className = 'space-y-1';
                 const label = Object.assign(document.createElement('label'), 
@@ -1310,7 +1339,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 }
                 
                 div.append(label, select);
-                chartConfigArea.appendChild(div);
+                parentElement.appendChild(div);
             };
 
             // Helper to create an <input> element
@@ -1360,7 +1389,43 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 case 'box':
                     // defaultNumericCol is passed as the 6th argument
                     createSelect('column-selector-x', labels.yAxisData, numericColumns, false, 1, defaultNumericCol);
-                    createSelect('column-selector-group', labels.groupColumn, columns); 
+                    
+                    // Container for grouping options
+                    const groupContainer = document.createElement('div');
+                    groupContainer.className = 'mt-4 space-y-2';
+                    chartConfigArea.appendChild(groupContainer);
+
+                    // Checkbox
+                    groupContainer.insertAdjacentHTML('beforeend', `
+                        <div class="flex items-center">
+                            <input id="multi-group-checkbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            <label for="multi-group-checkbox" class="ml-2 block text-sm font-medium text-gray-700">${labels.multiGroupCheckbox}</label>
+                        </div>
+                    `);
+
+                    // Single-select container (visible by default)
+                    const singleGroupContainer = document.createElement('div');
+                    singleGroupContainer.id = 'single-group-container';
+                    groupContainer.appendChild(singleGroupContainer);
+                    createSelect('column-selector-group', labels.groupColumn, columns, false, 1, '', singleGroupContainer);
+                    
+                    // Multi-select container (hidden by default)
+                    const multiGroupContainer = document.createElement('div');
+                    multiGroupContainer.id = 'multi-group-container';
+                    multiGroupContainer.className = 'hidden';
+                    groupContainer.appendChild(multiGroupContainer);
+                    createSelect('column-selector-group-multi', labels.groupColumns, columns, true, 5, '', multiGroupContainer);
+                    const hint = Object.assign(document.createElement('p'), {
+                        className: 'text-xs text-gray-500 mt-1',
+                        textContent: t.yAxisMultiSelectHint
+                    });
+                    multiGroupContainer.querySelector('div').appendChild(hint);
+                    
+                    // Event listener for the checkbox
+                    document.getElementById('multi-group-checkbox').addEventListener('change', (e) => {
+                        singleGroupContainer.classList.toggle('hidden', e.target.checked);
+                        multiGroupContainer.classList.toggle('hidden', !e.target.checked);
+                    });
                     break;
                 case 'bar':
                     createSelect('column-selector-x', labels.xAxisLabel, [t.indexOption, ...columns]);
@@ -1369,11 +1434,11 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 case 'line':
                     createSelect('column-selector-x', labels.xAxisLabel, [t.indexOption, ...columns]);
                     createSelect('column-selector-y', labels.yAxisMulti, numericColumns, true, 5);
-                    const hint = Object.assign(document.createElement('p'), {
+                    const lineHint = Object.assign(document.createElement('p'), {
                         className: 'text-xs text-gray-500 mt-1',
                         textContent: t.yAxisMultiSelectHint
                     });
-                    chartConfigArea.appendChild(hint);
+                    chartConfigArea.appendChild(lineHint);
                     break;
                 case 'scatter':
                     createSelect('column-selector-x', labels.xAxisData, numericColumns);
@@ -1385,7 +1450,44 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     createSelect('column-selector-group', labels.colorGroup, columns);
                     break;
                 case 'pareto':
-                    createSelect('pareto-category-col', labels.paretoCategory, columns);
+                    // Container for category options
+                    const paretoCatContainer = document.createElement('div');
+                    paretoCatContainer.className = 'space-y-2';
+                    chartConfigArea.appendChild(paretoCatContainer);
+
+                    // Checkbox
+                    paretoCatContainer.insertAdjacentHTML('beforeend', `
+                        <div class="flex items-center">
+                            <input id="multi-category-checkbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            <label for="multi-category-checkbox" class="ml-2 block text-sm font-medium text-gray-700">${labels.multiGroupCheckbox}</label>
+                        </div>
+                    `);
+
+                    // Single-select container (visible by default)
+                    const singleCatContainer = document.createElement('div');
+                    singleCatContainer.id = 'single-category-container';
+                    paretoCatContainer.appendChild(singleCatContainer);
+                    createSelect('pareto-category-col', labels.paretoCategory, columns, false, 1, '', singleCatContainer);
+                    
+                    // Multi-select container (hidden by default)
+                    const multiCatContainer = document.createElement('div');
+                    multiCatContainer.id = 'multi-category-container';
+                    multiCatContainer.className = 'hidden';
+                    paretoCatContainer.appendChild(multiCatContainer);
+                    createSelect('pareto-category-col-multi', labels.paretoCategories, columns, true, 4, '', multiCatContainer);
+                    const paretoHint = Object.assign(document.createElement('p'), {
+                        className: 'text-xs text-gray-500 mt-1',
+                        textContent: t.yAxisMultiSelectHint
+                    });
+                    multiCatContainer.querySelector('div').appendChild(paretoHint);
+                    
+                    // Event listener for the checkbox
+                    document.getElementById('multi-category-checkbox').addEventListener('change', (e) => {
+                        singleCatContainer.classList.toggle('hidden', e.target.checked);
+                        multiCatContainer.classList.toggle('hidden', !e.target.checked);
+                    });
+
+                    // Other pareto settings
                     createSelect('pareto-value-col', labels.paretoValue, [labels.paretoValueOption, ...columns]);
                     createInput('pareto-top-n', labels.paretoTopN, 'number', 10);
                     chartConfigArea.insertAdjacentHTML('beforeend', `
@@ -1466,6 +1568,8 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const groupCol = document.getElementById('column-selector-group')?.value; 
             const colorCol = document.getElementById('column-selector-color')?.value; 
             const regressionType = document.querySelector('input[name="regression-type"]:checked')?.value || 'none';
+            const isMultiGroup = document.getElementById('multi-group-checkbox')?.checked;
+            const multiGroupCols = isMultiGroup ? getSelectedValues('column-selector-group-multi') : [];
             
             const firstYCol = yCols[0] || '';
             const xIsIndex = (type === 'bar' || type === 'line') && xCol === t.indexOption;
@@ -1495,15 +1599,50 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             // --- Data Grouping ---
             let groupedData = { 'all': rawData };
             let groupKeys = ['all'];
-            if ((type === 'box' && groupCol) || ((type === 'histogram' || type === 'scatter') && colorCol)) {
-                const col = groupCol || colorCol;
+            let activeGroupCols = [];
+            let groupingActive = false;
+
+            if (type === 'box') {
+                if (isMultiGroup && multiGroupCols.length > 0) {
+                    activeGroupCols = multiGroupCols;
+                    groupingActive = true;
+                } else if (groupCol) {
+                    activeGroupCols = [groupCol];
+                    groupingActive = true;
+                }
+            } else if ((type === 'histogram' || type === 'scatter') && colorCol) {
+                activeGroupCols = [colorCol];
+                groupingActive = true;
+            }
+
+            if (groupingActive) {
                 groupedData = rawData.reduce((acc, row) => {
-                    const key = String(row[col] ?? '(null)');
+                    const key = activeGroupCols.map(col => String(row[col] ?? '(null)')).join(' | ');
                     (acc[key] = acc[key] || []).push(row);
                     return acc;
                 }, {});
-                groupKeys = Object.keys(groupedData).sort();
-                // For scatter plots, color grouping happens within the trace generation
+                groupKeys = Object.keys(groupedData);
+                
+                // Sort group keys: numerically if all grouping columns are numeric, otherwise lexicographically.
+                if (areColumnsNumeric(activeGroupCols)) {
+                    groupKeys.sort((a, b) => {
+                        const partsA = a.split(' | ').map(Number);
+                        const partsB = b.split(' | ').map(Number);
+                        if (partsA.some(isNaN) || partsB.some(isNaN)) {
+                            return a.localeCompare(b); // Fallback for safety
+                        }
+                        for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+                            if (partsA[i] !== partsB[i]) {
+                                return partsA[i] - partsB[i];
+                            }
+                        }
+                        return partsA.length - partsB.length;
+                    });
+                } else {
+                    groupKeys.sort();
+                }
+                
+                // Reset for scatter plot, which handles its own color grouping inside the trace generation
                 if (type === 'scatter') { 
                     groupKeys = ['all']; 
                     groupedData = { 'all': rawData }; 
@@ -1519,9 +1658,15 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 switch (type) {
                     case 'box':
                         const yValuesBox = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
-                        traces.push({ y: yValuesBox, x: groupCol ? Array(groupRows.length).fill(key) : undefined, boxpoints: 'all', type: 'box', name: groupName });
+                        traces.push({ 
+                            y: yValuesBox, 
+                            x: groupingActive ? Array(groupRows.length).fill(key) : undefined, 
+                            boxpoints: 'all', 
+                            type: 'box', 
+                            name: groupName 
+                        });
                         layout.yaxis.title = xCol; 
-                        layout.xaxis.title = groupCol || '';
+                        layout.xaxis.title = groupingActive ? activeGroupCols.join(', ') : '';
                         break;
                     case 'histogram':
                         const xValues = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
@@ -1617,22 +1762,36 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
          * Draws a Pareto chart.
          */
         function drawParetoChart() {
-            const categoryCol = document.getElementById('pareto-category-col').value;
+            const isMultiCategory = document.getElementById('multi-category-checkbox')?.checked;
+            const categoryCols = (isMultiCategory 
+                ? getSelectedValues('pareto-category-col-multi') 
+                : [document.getElementById('pareto-category-col')?.value])
+                .filter(c => c); // Filter out empty strings from selection
+
             const valueColRaw = document.getElementById('pareto-value-col').value;
             const topN = parseInt(document.getElementById('pareto-top-n').value) || 10;
             const excludeOther = document.getElementById('pareto-exclude-other').checked;
             const t = translations[currentLang];
             
-            if (!categoryCol) throw new Error(t.errorParetoCategory);
+            if (categoryCols.length === 0) throw new Error(t.errorParetoCategory);
 
             const valueCol = valueColRaw === t.configLabels.paretoValueOption ? null : valueColRaw;
             
             // Aggregate data by category
             const aggregatedData = rawData.reduce((acc, row) => {
-                const category = row[categoryCol];
-                const value = valueCol ? (typeof row[valueCol] === 'number' ? row[valueCol] : 0) : 1;
-                if (category != null) {
-                    acc[String(category)] = (acc[String(category)] || 0) + value;
+                let isValid = true;
+                const categoryValues = categoryCols.map(col => {
+                    const val = row[col];
+                    if (val == null) { // checks for null and undefined
+                        isValid = false;
+                    }
+                    return String(val ?? '(null)');
+                });
+
+                if (isValid) {
+                    const categoryKey = categoryValues.join(' | ');
+                    const value = valueCol ? (typeof row[valueCol] === 'number' ? row[valueCol] : 0) : 1;
+                    acc[categoryKey] = (acc[categoryKey] || 0) + value;
                 }
                 return acc;
             }, {});
@@ -1657,7 +1816,6 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 d.cumulativeRatio = (cumulative / total) * 100; 
             });
             
-            // --- MODIFICATION START ---
             // Create numeric indices for positioning, and category labels for display.
             const x_indices = displayData.map((_, i) => i);
             const categories = displayData.map(d => d.category);
@@ -1673,7 +1831,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const lineTrace = { x: line_x_indices, y: ratios, type: 'scatter', mode: 'lines+markers', name: 'Cumulative %', yaxis: 'y2' };
             
             const chartTitleInput = document.getElementById('chart-title').value.trim();
-            const chartTitle = chartTitleInput || `${categoryCol} ${t.chartTypes.pareto}`;
+            const chartTitle = chartTitleInput || `${categoryCols.join(', ')} ${t.chartTypes.pareto}`;
             
             const layout = { 
                 title: chartTitle, 
@@ -1705,7 +1863,6 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 }]
             };
             Plotly.newPlot(chartContainer, [barTrace, lineTrace], layout, { responsive: true });
-            // --- MODIFICATION END ---
         }
 
         /**
@@ -1800,4 +1957,3 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
     </script>
 </body>
 </html>
-
