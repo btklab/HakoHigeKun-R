@@ -77,12 +77,15 @@
 
     <div class="sidebar bg-white p-6 shadow-xl overflow-y-auto">
         <h1 class="text-3xl font-extrabold text-blue-700 mb-2 border-b pb-2">
-            <span data-lang-key="appTitle">📊 箱ひげくん-R</span>
+            <span data-lang-key="appTitle" onclick="location.reload()" style="cursor: pointer;" data-lang-key-title="refreshTitle">📊 箱ひげくん-R</span>
         </h1>
 
-        <div class="language-switcher text-right mb-4">
-            <button onclick="setLanguage('ja')" class="lang-btn text-xs py-1 px-3 rounded-l-lg border border-gray-300" data-lang="ja">日本語</button>
-            <button onclick="setLanguage('en')" class="lang-btn text-xs py-1 px-3 rounded-r-lg border-t border-b border-r border-gray-300" data-lang="en">English</button>
+        <div class="language-switcher flex justify-end items-center mb-4">
+            <button onclick="location.reload()" class="text-xs py-1 px-3 rounded-md border border-gray-300 bg-gray-50 hover:bg-gray-100 mr-2" data-lang-key="refreshButton" data-lang-key-title="refreshTitle">リフレッシュ</button>
+            <div>
+                <button onclick="setLanguage('ja')" class="lang-btn text-xs py-1 px-3 rounded-l-lg border border-gray-300" data-lang="ja">日本語</button>
+                <button onclick="setLanguage('en')" class="lang-btn text-xs py-1 px-3 rounded-r-lg border-t border-b border-r border-gray-300" data-lang="en">English</button>
+            </div>
         </div>
         
         <div class="mb-8">
@@ -232,6 +235,8 @@
                 errorXRData: "X-Rs Control Chart requires at least two numeric data points.",
                 errorMRData: "Not enough data to calculate moving range.",
                 downloadImageError: "An error occurred while downloading the chart image. Please check if the chart is displayed correctly.",
+                refreshButton: "Refresh",
+                refreshTitle: "Reload Application",
                 chartTypes: {
                     box: "Box Plot",
                     histogram: "Histogram",
@@ -306,6 +311,8 @@
                 errorXRData: "X-Rs管理図を描画するには、2つ以上の数値データが必要です。",
                 errorMRData: "移動範囲を計算できるデータがありません。",
                 downloadImageError: "グラフ画像のダウンロード中にエラーが発生しました。グラフが正しく描画されているか確認してください。",
+                refreshButton: "リフレッシュ",
+                refreshTitle: "アプリを再読み込み",
                 chartTypes: {
                     histogram: 'ヒストグラム',
                     box: '箱ひげ図',
@@ -383,6 +390,14 @@
                 const key = el.getAttribute('data-lang-key-placeholder');
                 if (t[key]) {
                     el.placeholder = t[key];
+                }
+            });
+            
+            // Update title text using data-lang-key-title attributes
+            document.querySelectorAll('[data-lang-key-title]').forEach(el => {
+                const key = el.getAttribute('data-lang-key-title');
+                if (t[key]) {
+                    el.title = t[key];
                 }
             });
 

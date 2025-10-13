@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-- NA
+- Add-Feature [index.html] Enable content refresh when clicking the title or pressing the refresh button.
 
 ## [0.1.1] - 2025-10-12
 
@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [README.md]: blob/main/README.md
 [CHANGELOG.md]: blob/main/CHANGELOG.md
+[index.html]: blob/main/index.html
 
 
 [unreleased]: https://github.com/btklab/pwsh-sketches/compare/0.1.0..HEAD
