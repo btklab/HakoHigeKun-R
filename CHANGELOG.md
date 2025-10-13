@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+- Add-Feature [index.html] Add sample data `allisonhorst/palmerpenguins`.
 - Add-Feature [index.html] Enable content refresh when clicking the title or pressing the refresh button.
 
 ## [0.1.1] - 2025-10-12
