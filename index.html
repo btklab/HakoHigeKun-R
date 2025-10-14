@@ -277,6 +277,7 @@
                 configLabels: {
                     xAxisData: "Data Column (X-axis)",
                     yAxisData: "Data Column (Y-axis)",
+                    yAxisDataMulti: "Data Columns (Y-axis) - Multi-select",
                     groupColumn: "Group Column (X-axis) (optional)",
                     groupColumns: "Group Columns (X-axis) (optional)",
                     multiGroupCheckbox: "Specify multiple columns",
@@ -360,6 +361,7 @@
                 configLabels: {
                     xAxisData: "データ列 (X軸)",
                     yAxisData: "データ列 (Y軸)",
+                    yAxisDataMulti: "データ列 (Y軸) - 複数選択可能",
                     groupColumn: "グループ列 (X軸) (オプション)",
                     groupColumns: "グループ列 (X軸) (オプション)",
                     multiGroupCheckbox: "複数列を指定",
@@ -1072,7 +1074,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             renderSummaryStatistics(); 
             renderChartConfigUI(); 
             
-            // (オプション) 最初の数値列が設定された状態でグラフを自動描画する
+            // (Optional) Auto-draw the graph with the first numeric column set
             const initialChartType = chartTypeSelect.value;
             if (initialChartType === 'box' && findFirstNumericColumn(data, fields)) {
                 drawChart();
@@ -1387,41 +1389,65 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     createInput('histogram-n-bins', labels.nBins, 'number', 10);
                     break;
                 case 'box':
-                    // defaultNumericCol is passed as the 6th argument
-                    createSelect('column-selector-x', labels.yAxisData, numericColumns, false, 1, defaultNumericCol);
+                    // --- Container for Y-axis Data Column(s) ---
+                    const dataContainer = document.createElement('div');
+                    dataContainer.className = 'mb-4 p-3 border border-gray-200 rounded-lg bg-gray-50';
+                    chartConfigArea.appendChild(dataContainer);
+
+                    dataContainer.insertAdjacentHTML('beforeend', `
+                        <div class="flex items-center">
+                            <input id="multi-data-checkbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            <label for="multi-data-checkbox" class="ml-2 block text-sm font-medium text-gray-700">${labels.multiGroupCheckbox}</label>
+                        </div>
+                    `);
                     
-                    // Container for grouping options
+                    const singleDataContainer = document.createElement('div');
+                    singleDataContainer.id = 'single-data-container';
+                    dataContainer.appendChild(singleDataContainer);
+                    createSelect('column-selector-y-single', labels.yAxisData, numericColumns, false, 1, defaultNumericCol, singleDataContainer);
+
+                    const multiDataContainer = document.createElement('div');
+                    multiDataContainer.id = 'multi-data-container';
+                    multiDataContainer.className = 'hidden';
+                    dataContainer.appendChild(multiDataContainer);
+                    createSelect('column-selector-y-multi', labels.yAxisDataMulti, numericColumns, true, 4, '', multiDataContainer);
+                    const yHint = Object.assign(document.createElement('p'), {
+                        className: 'text-xs text-gray-500 mt-1', textContent: t.yAxisMultiSelectHint
+                    });
+                    multiDataContainer.querySelector('div').appendChild(yHint);
+                    
+                    document.getElementById('multi-data-checkbox').addEventListener('change', (e) => {
+                        singleDataContainer.classList.toggle('hidden', e.target.checked);
+                        multiDataContainer.classList.toggle('hidden', !e.target.checked);
+                    });
+                    
+                    // --- Container for X-axis Grouping Column(s) ---
                     const groupContainer = document.createElement('div');
-                    groupContainer.className = 'mt-4 space-y-2';
+                    groupContainer.className = 'mt-2 p-3 border border-gray-200 rounded-lg bg-gray-50';
                     chartConfigArea.appendChild(groupContainer);
 
-                    // Checkbox
                     groupContainer.insertAdjacentHTML('beforeend', `
                         <div class="flex items-center">
                             <input id="multi-group-checkbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
                             <label for="multi-group-checkbox" class="ml-2 block text-sm font-medium text-gray-700">${labels.multiGroupCheckbox}</label>
                         </div>
                     `);
-
-                    // Single-select container (visible by default)
+                    
                     const singleGroupContainer = document.createElement('div');
                     singleGroupContainer.id = 'single-group-container';
                     groupContainer.appendChild(singleGroupContainer);
                     createSelect('column-selector-group', labels.groupColumn, columns, false, 1, '', singleGroupContainer);
                     
-                    // Multi-select container (hidden by default)
                     const multiGroupContainer = document.createElement('div');
                     multiGroupContainer.id = 'multi-group-container';
                     multiGroupContainer.className = 'hidden';
                     groupContainer.appendChild(multiGroupContainer);
-                    createSelect('column-selector-group-multi', labels.groupColumns, columns, true, 5, '', multiGroupContainer);
-                    const hint = Object.assign(document.createElement('p'), {
-                        className: 'text-xs text-gray-500 mt-1',
-                        textContent: t.yAxisMultiSelectHint
+                    createSelect('column-selector-group-multi', labels.groupColumns, columns, true, 4, '', multiGroupContainer);
+                    const xHint = Object.assign(document.createElement('p'), {
+                        className: 'text-xs text-gray-500 mt-1', textContent: t.yAxisMultiSelectHint
                     });
-                    multiGroupContainer.querySelector('div').appendChild(hint);
+                    multiGroupContainer.querySelector('div').appendChild(xHint);
                     
-                    // Event listener for the checkbox
                     document.getElementById('multi-group-checkbox').addEventListener('change', (e) => {
                         singleGroupContainer.classList.toggle('hidden', e.target.checked);
                         multiGroupContainer.classList.toggle('hidden', !e.target.checked);
@@ -1561,147 +1587,144 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
          */
         function drawBasicChart(type) {
             const t = translations[currentLang];
-            
+            let traces = [];
+            const layout = { 
+                margin: { t: 50, b: 40, l: 50, r: 20 }, 
+                height: 550, 
+                hovermode: 'closest',
+                xaxis: { automargin: true },
+                yaxis: { automargin: true }
+            };
+
             // Get values from UI controls
             const xCol = document.getElementById('column-selector-x')?.value;
             const yCols = getSelectedValues('column-selector-y');
-            const groupCol = document.getElementById('column-selector-group')?.value; 
-            const colorCol = document.getElementById('column-selector-color')?.value; 
+            const colorCol = document.getElementById('column-selector-color')?.value;
             const regressionType = document.querySelector('input[name="regression-type"]:checked')?.value || 'none';
-            const isMultiGroup = document.getElementById('multi-group-checkbox')?.checked;
-            const multiGroupCols = isMultiGroup ? getSelectedValues('column-selector-group-multi') : [];
-            
             const firstYCol = yCols[0] || '';
             const xIsIndex = (type === 'bar' || type === 'line') && xCol === t.indexOption;
-
-            // --- Input Validation ---
-            if (!xCol && type !== 'box') throw new Error(t.errorMissingData);
-            if ((type === 'bar' || type === 'line') && xCol === '') throw new Error(t.errorMissingX);
-            if ((type === 'bar' || type === 'line' || type === 'scatter') && yCols.length === 0) throw new Error(t.errorMissingY);
-            if (type === 'box' && !xCol) throw new Error(t.errorBoxData);
-
+            
+            // --- Input Validation for non-box charts ---
+            if (type !== 'box') {
+                if (!xCol) throw new Error(t.errorMissingData);
+                if ((type === 'bar' || type === 'line') && xCol === '') throw new Error(t.errorMissingX);
+                if ((type === 'bar' || type === 'line' || type === 'scatter') && yCols.length === 0) throw new Error(t.errorMissingY);
+            }
+            
             // --- Chart Title Generation ---
             const chartTitleInput = document.getElementById('chart-title').value.trim();
-            const defaultTitleX = xIsIndex ? 'Index' : (xCol || '');
-            const defaultTitleY = firstYCol ? ` vs ${firstYCol}` : '';
-            const chartTitle = chartTitleInput || `${defaultTitleX}${defaultTitleY} ${t.chartTypes[type]}`;
-            
-            let traces = [];
-            const layout = { 
-                title: chartTitle, 
-                margin: { t: 40, b: 40, l: 40, r: 20 }, 
-                height: 550, 
-                hovermode: 'closest',
-                xaxis: { title: xIsIndex ? 'Index' : (xCol || groupCol || 'Data'), automargin: true },
-                yaxis: { title: yCols.length > 1 ? 'Value' : firstYCol, automargin: true } 
-            };
 
-            // --- Data Grouping ---
-            let groupedData = { 'all': rawData };
-            let groupKeys = ['all'];
-            let activeGroupCols = [];
-            let groupingActive = false;
+            switch (type) {
+                case 'box':
+                    const isMultiData = document.getElementById('multi-data-checkbox')?.checked;
+                    const dataCols = isMultiData ? getSelectedValues('column-selector-y-multi') : [document.getElementById('column-selector-y-single')?.value];
+                    const activeDataCols = dataCols.filter(c => c);
 
-            if (type === 'box') {
-                if (isMultiGroup && multiGroupCols.length > 0) {
-                    activeGroupCols = multiGroupCols;
-                    groupingActive = true;
-                } else if (groupCol) {
-                    activeGroupCols = [groupCol];
-                    groupingActive = true;
-                }
-            } else if ((type === 'histogram' || type === 'scatter') && colorCol) {
-                activeGroupCols = [colorCol];
-                groupingActive = true;
-            }
+                    const isMultiGroup = document.getElementById('multi-group-checkbox')?.checked;
+                    const groupColsRaw = isMultiGroup ? getSelectedValues('column-selector-group-multi') : [document.getElementById('column-selector-group')?.value];
+                    const activeGroupCols = groupColsRaw.filter(c => c);
+                    
+                    if (activeDataCols.length === 0) throw new Error(t.errorBoxData);
 
-            if (groupingActive) {
-                groupedData = rawData.reduce((acc, row) => {
-                    const key = activeGroupCols.map(col => String(row[col] ?? '(null)')).join(' | ');
-                    (acc[key] = acc[key] || []).push(row);
-                    return acc;
-                }, {});
-                groupKeys = Object.keys(groupedData);
-                
-                // Sort group keys: numerically if all grouping columns are numeric, otherwise lexicographically.
-                if (areColumnsNumeric(activeGroupCols)) {
-                    groupKeys.sort((a, b) => {
-                        const partsA = a.split(' | ').map(Number);
-                        const partsB = b.split(' | ').map(Number);
-                        if (partsA.some(isNaN) || partsB.some(isNaN)) {
-                            return a.localeCompare(b); // Fallback for safety
-                        }
-                        for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
-                            if (partsA[i] !== partsB[i]) {
-                                return partsA[i] - partsB[i];
-                            }
-                        }
-                        return partsA.length - partsB.length;
-                    });
-                } else {
-                    groupKeys.sort();
-                }
-                
-                // Reset for scatter plot, which handles its own color grouping inside the trace generation
-                if (type === 'scatter') { 
-                    groupKeys = ['all']; 
-                    groupedData = { 'all': rawData }; 
-                }
-            }
-            
-            // --- Trace Generation ---
-            groupKeys.forEach(key => {
-                const groupRows = groupedData[key];
-                const groupName = key === 'all' ? '' : key;
-                const xData = xIsIndex ? groupRows.map((_, i) => i + 1) : (xCol ? groupRows.map(d => d[xCol]) : null);
+                    layout.title = chartTitleInput || `${activeDataCols.join(', ')}${activeGroupCols.length > 0 ? ` by ${activeGroupCols.join(', ')}` : ''} ${t.chartTypes.box}`;
+                    const groupingActive = activeGroupCols.length > 0;
 
-                switch (type) {
-                    case 'box':
-                        const yValuesBox = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
-                        traces.push({ 
-                            y: yValuesBox, 
-                            x: groupingActive ? Array(groupRows.length).fill(key) : undefined, 
-                            boxpoints: 'all', 
-                            type: 'box', 
-                            name: groupName 
-                        });
-                        layout.yaxis.title = xCol; 
-                        layout.xaxis.title = groupingActive ? activeGroupCols.join(', ') : '';
-                        break;
-                    case 'histogram':
-                        const xValues = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
-                        const nBins = parseInt(document.getElementById('histogram-n-bins')?.value) || 10;
-                        traces.push({ x: xValues, type: 'histogram', name: groupName, opacity: 0.7, nbinsx: nBins });
-                        layout.barmode = 'overlay'; 
-                        layout.yaxis.title = 'Frequency';
-                        break;
-                    case 'bar':
-                        traces.push({ x: xData, y: groupRows.map(d => d[firstYCol]), type: 'bar', name: firstYCol });
-                        break;
-                    case 'line':
-                        yCols.forEach(yCol => traces.push({ x: xData, y: groupRows.map(d => d[yCol]), mode: 'lines', type: 'scatter', name: yCol }));
-                        layout.showlegend = yCols.length > 1; 
-                        layout.yaxis.title = 'Value';
-                        break;
-                    case 'scatter':
-                        const colorGroups = groupRows.reduce((acc, d) => {
-                            const cKey = colorCol ? String(d[colorCol] ?? '(null)') : 'default';
-                            (acc[cKey] = acc[cKey] || { x: [], y: [] }).x.push(d[xCol]);
-                            acc[cKey].y.push(d[firstYCol]);
+                    if (groupingActive) {
+                        const groupedData = rawData.reduce((acc, row) => {
+                            const key = activeGroupCols.map(col => String(row[col] ?? '(null)')).join(' | ');
+                            (acc[key] = acc[key] || []).push(row);
                             return acc;
                         }, {});
+                        let groupKeys = Object.keys(groupedData);
 
-                        Object.keys(colorGroups).forEach(gKey => {
-                            traces.push({ x: colorGroups[gKey].x, y: colorGroups[gKey].y, mode: 'markers', type: 'scatter', name: gKey });
+                        if (areColumnsNumeric(activeGroupCols)) {
+                            groupKeys.sort((a, b) => {
+                                const partsA = a.split(' | ').map(Number);
+                                const partsB = b.split(' | ').map(Number);
+                                if (partsA.some(isNaN) || partsB.some(isNaN)) return a.localeCompare(b);
+                                for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+                                    if (partsA[i] !== partsB[i]) return partsA[i] - partsB[i];
+                                }
+                                return partsA.length - partsB.length;
+                            });
+                        } else {
+                            groupKeys.sort();
+                        }
+                        
+                        activeDataCols.forEach(dataCol => {
+                            const x_categories_for_trace = [];
+                            const y_values_for_trace = [];
+                            groupKeys.forEach(groupKey => {
+                                const numericData = groupedData[groupKey].map(r => r[dataCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                                if (numericData.length > 0) {
+                                    y_values_for_trace.push(...numericData);
+                                    x_categories_for_trace.push(...Array(numericData.length).fill(groupKey));
+                                }
+                            });
+                            if (y_values_for_trace.length > 0) {
+                                traces.push({ x: x_categories_for_trace, y: y_values_for_trace, name: dataCol, type: 'box', boxpoints: 'all' });
+                            }
                         });
+                        layout.boxmode = 'group';
+                        layout.xaxis.title = activeGroupCols.join(', ');
+                        layout.yaxis.title = activeDataCols.length > 1 ? 'Value' : activeDataCols[0];
+                    } else {
+                        activeDataCols.forEach(dataCol => {
+                            const yValues = rawData.map(d => d[dataCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                            if (yValues.length > 0) {
+                                traces.push({ y: yValues, name: dataCol, type: 'box', boxpoints: 'all' });
+                            }
+                        });
+                        layout.xaxis.title = 'Variable';
+                        layout.yaxis.title = 'Value';
+                    }
+                    break;
+
+                case 'histogram':
+                case 'scatter':
+                    layout.title = chartTitleInput || `${xCol}${firstYCol ? ` vs ${firstYCol}`:''} ${t.chartTypes[type]}`;
+                    const colorGroupingActive = colorCol;
+                    let colorGroupedData = { 'all': rawData };
+                    let colorGroupKeys = ['all'];
+
+                    if (colorGroupingActive) {
+                        colorGroupedData = rawData.reduce((acc, row) => {
+                            const key = String(row[colorCol] ?? '(null)');
+                            (acc[key] = acc[key] || []).push(row);
+                            return acc;
+                        }, {});
+                        colorGroupKeys = Object.keys(colorGroupedData).sort();
+                    }
+
+                    colorGroupKeys.forEach(key => {
+                        const groupRows = colorGroupedData[key];
+                        const groupName = key === 'all' ? (firstYCol || xCol) : key;
                         
-                        layout.showlegend = !!colorCol; 
+                        if (type === 'histogram') {
+                            const xValues = groupRows.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                            const nBins = parseInt(document.getElementById('histogram-n-bins')?.value) || 10;
+                            traces.push({ x: xValues, type: 'histogram', name: groupName, opacity: 0.7, nbinsx: nBins });
+                        } else { // scatter
+                            traces.push({ 
+                                x: groupRows.map(d => d[xCol]), 
+                                y: groupRows.map(d => d[firstYCol]), 
+                                mode: 'markers', type: 'scatter', name: groupName 
+                            });
+                        }
+                    });
+                    
+                    if (type === 'histogram') {
+                        layout.barmode = 'overlay';
+                        layout.xaxis.title = xCol;
+                        layout.yaxis.title = 'Frequency';
+                    } else { // scatter
+                        layout.showlegend = !!colorCol;
+                        layout.xaxis.title = xCol;
                         layout.yaxis.title = firstYCol;
-                        
-                        // Add regression line if selected
                         if (regressionType === 'linear') {
-                            const xVals = rawData.map(d => d[xCol]).filter(v => typeof v === 'number' && !isNaN(v));
-                            const yVals = rawData.map(d => d[firstYCol]).filter(v => typeof v === 'number' && !isNaN(v));
+                            const validPoints = rawData.filter(d => typeof d[xCol] === 'number' && typeof d[firstYCol] === 'number');
+                            const xVals = validPoints.map(d => d[xCol]);
+                            const yVals = validPoints.map(d => d[firstYCol]);
                             if (xVals.length > 1) {
                                 const n = xVals.length;
                                 const sumX = xVals.reduce((a, b) => a + b, 0), sumY = yVals.reduce((a, b) => a + b, 0);
@@ -1709,14 +1732,29 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                                 const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
                                 const a = (sumY / n) - b * (sumX / n);
                                 const xMin = Math.min(...xVals), xMax = Math.max(...xVals);
-                                traces.push({ x: [xMin, xMax], y: [a + b * xMin, a + b * xMax], mode: 'lines', type: 'scatter', line: { color: 'red' }, name: labels.regression.linear });
+                                traces.push({ x: [xMin, xMax], y: [a + b * xMin, a + b * xMax], mode: 'lines', type: 'scatter', line: { color: 'red' }, name: t.configLabels.regression.linear });
                             }
                         }
-                        break;
-                }
-            });
+                    }
+                    break;
 
-            if (type === 'bar' || type === 'line') layout.xaxis.type = xIsIndex ? 'linear' : 'category';
+                case 'bar':
+                case 'line':
+                    const xData = xIsIndex ? rawData.map((_, i) => i + 1) : rawData.map(d => d[xCol]);
+                    layout.title = chartTitleInput || `${xIsIndex ? 'Index' : xCol} vs ${yCols.join(', ')} ${t.chartTypes[type]}`;
+                    layout.xaxis.title = xIsIndex ? 'Index' : xCol;
+                    layout.xaxis.type = xIsIndex ? 'linear' : 'category';
+                    layout.yaxis.title = 'Value';
+
+                    if (type === 'bar') {
+                        traces.push({ x: xData, y: rawData.map(d => d[firstYCol]), type: 'bar', name: firstYCol });
+                    } else { // line
+                        yCols.forEach(yCol => traces.push({ x: xData, y: rawData.map(d => d[yCol]), mode: 'lines', type: 'scatter', name: yCol }));
+                        layout.showlegend = yCols.length > 1;
+                    }
+                    break;
+            }
+
             Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
         }
 
@@ -1738,8 +1776,15 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
 
             const marker = { size: 4, opacity: 0.8 };
             if (groupCol) {
-                marker.color = rawData.map(d => String(d[groupCol] ?? '(null)'));
-                marker.showscale = true;
+                // Create a mapping from unique group values to integers for coloring
+                const uniqueGroups = [...new Set(rawData.map(d => d[groupCol]))];
+                const colorMap = uniqueGroups.reduce((acc, val, i) => {
+                    acc[val] = i;
+                    return acc;
+                }, {});
+                marker.color = rawData.map(d => colorMap[d[groupCol]]);
+                // Add colorbar if you want a legend for the colors
+                // marker.colorbar = { title: groupCol };
             }
 
             const trace = { 
