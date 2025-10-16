@@ -3,6 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+        Content Security Policy (CSP)
+        This policy enhances security by restricting where resources (like scripts and styles) can be loaded from.
+        - default-src 'self': By default, only allow resources from the same origin.
+        - script-src 'self' 'unsafe-inline' blob:: Allows scripts from the same origin, inline scripts, and blob URLs.
+          'blob:' is required for Plotly.js WebGL charts (like pair plots) to work correctly.
+        - style-src 'self' 'unsafe-inline' data:: Allows stylesheets from the same origin, inline styles, and data URIs.
+          'data:' is added for broader compatibility with dynamically generated styles.
+        - img-src 'self' data: https://allisonhorst.github.io: Allow images from the same origin, data URIs, and the palmerpenguins logo source.
+        - object-src 'none': Disallow plugins like Flash.
+        - frame-ancestors 'none': Prevent the page from being embedded in an iframe.
+    -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' data:; worker-src 'self' blob:; img-src 'self' data: https://allisonhorst.github.io; object-src 'none'; frame-ancestors 'none';"> -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' data:; img-src 'self' data: https://allisonhorst.github.io; object-src 'none'; frame-ancestors 'none';">
+
     <title data-lang-key="pageTitle">HakoHigeKun-R - Instant Offline Box Plotter</title>
     <!--
         HakoHigeKun-R
@@ -21,6 +36,14 @@
             - "palmerpenguins" dataset
               Source: https://github.com/allisonhorst/palmerpenguins
               License: CC0 1.0 (Public Domain)
+    -->
+
+    <!--
+        Subresource Integrity (SRI) - Security Recommendation
+        If these libraries were hosted on a CDN, it would be best practice to add an 'integrity' attribute.
+        This ensures the file hasn't been tampered with.
+        Example: <script src="https://example.com/library.js" integrity="sha256-hashvalue" crossorigin="anonymous"></script>
+        Since these are local files, SRI is not applicable, but it's important to be aware of for web deployment.
     -->
     <script src="libs/tailwindcss.js"></script>
     <script src="libs/plotly-2.32.0.min.js"></script>
@@ -213,6 +236,28 @@
 
     <script>
         // ===================================================================================
+        // Security Utilities
+        // ===================================================================================
+
+        /**
+         * Sanitizes a string by converting HTML special characters to their entity equivalents.
+         * This helps prevent Cross-Site Scripting (XSS) attacks when rendering user-provided content.
+         * @param {string} str - The input string to sanitize.
+         * @returns {string} The sanitized string.
+         */
+        function sanitizeHTML(str) {
+            if (typeof str !== 'string') return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return str.replace(/[&<>"']/g, (m) => map[m]);
+        }
+
+        // ===================================================================================
         // Internationalization (i18n)
         // ===================================================================================
 
@@ -253,7 +298,7 @@
                 errorMissingX: "Bar/Line charts require an X-axis or index selection.",
                 errorMissingY: "Y-axis data column not selected.",
                 errorBoxData: "Box plot requires a data column.",
-                errorPairPlot: "Pair plot requires at least two numeric columns.",
+                //errorPairPlot: "Pair plot requires at least two numeric columns.",
                 errorParetoCategory: "Category column is not selected.",
                 errorXRData: "X-Rs Control Chart requires at least two numeric data points.",
                 errorMRData: "Not enough data to calculate moving range.",
@@ -270,7 +315,7 @@
                     bar: "Bar Chart",
                     line: "Line Chart",
                     scatter: "Scatter Plot",
-                    pairplot: "Pair Plot",
+                    //pairplot: "Pair Plot",
                     pareto: "Pareto Chart",
                     xrs_control_chart: "X-Rs Control Chart"
                 },
@@ -325,7 +370,7 @@
                 summaryStatsTitle: "🔢 要約統計量 (数値列のみ)",
                 downloadCsvButton: "CSVダウンロード",
                 summaryStatsPlaceholder: "データが読み込まれると、数値列の統計が表示されます。",
-                noNumericData: "数値データを含む列が見つかりませんでした。",
+                noNumericData: "数値データを含む列が見つませんでした。",
                 downloadStatsError: "ダウンロードする統計データがありません。",
                 selectOptionDefault: "--- 選択 ---",
                 indexOption: "--- インデックス値 (1, 2, 3...) ---",
@@ -337,7 +382,7 @@
                 errorMissingX: "棒グラフ、折れ線グラフにはX軸またはインデックスの選択が必要です。",
                 errorMissingY: "Y軸にデータ列が選択されていません。",
                 errorBoxData: "箱ひげ図にはデータ列が必要です。",
-                errorPairPlot: "行列散布図を描画するには、2つ以上の数値列が必要です。",
+                //errorPairPlot: "行列散布図を描画するには、2つ以上の数値列が必要です。",
                 errorParetoCategory: "カテゴリ列が選択されていません。",
                 errorXRData: "X-Rs管理図を描画するには、2つ以上の数値データが必要です。",
                 errorMRData: "移動範囲を計算できるデータがありません。",
@@ -354,7 +399,7 @@
                     bar: '棒グラフ',
                     line: '折れ線グラフ',
                     scatter: '散布図',
-                    pairplot: '行列散布図', 
+                    //pairplot: '行列散布図', 
                     pareto: 'パレート図',
                     xrs_control_chart: 'X-Rs管理図',
                 },
@@ -398,7 +443,7 @@
             currentLang = lang;
             localStorage.setItem('language', lang);
 
-            // CHART_TYPESを再生成
+            // Re-generate CHART_TYPES based on the selected language
             const t = translations[lang];
             Object.assign(CHART_TYPES, t.chartTypes);
         
@@ -924,7 +969,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 },
                 error: function(error) {
                     console.error('Error parsing sample data:', error);
-                    statusElement.innerHTML = `${t.errorLoadingSampleData}<br><span class="text-xs">${error.message}</span>`;
+                    statusElement.innerHTML = `${t.errorLoadingSampleData}<br><span class="text-xs">${sanitizeHTML(error.message)}</span>`;
                     statusElement.classList.remove('hidden', 'text-blue-600');
                     statusElement.classList.add('text-red-600');
                     alert(t.parseError('CSV', error.message));
@@ -1140,6 +1185,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
 
         /**
          * Renders a preview of the first 10 rows of data in a table.
+         * Uses textContent for cell data to prevent XSS from data values.
          */
         function renderDataPreview() {
             const table = document.getElementById('data-preview-table');
@@ -1150,6 +1196,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const headerRow = thead.insertRow();
             columns.forEach(col => {
                 const th = document.createElement('th');
+                // Use textContent to safely render column names, preventing XSS
                 th.textContent = col;
                 th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-100';
                 headerRow.appendChild(th);
@@ -1163,6 +1210,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 columns.forEach(col => {
                     const cell = row.insertCell();
                     const value = rawData[i][col];
+                    // Use textContent to safely render cell data
                     cell.textContent = value ?? ''; // Use nullish coalescing for cleaner code
                     cell.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-500';
                 });
@@ -1205,6 +1253,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
 
         /**
          * Renders a table with summary statistics for all numeric columns.
+         * Sanitizes column headers before inserting them as HTML.
          */
         function renderSummaryStatistics() {
             const container = document.getElementById('summary-statistics-container');
@@ -1240,7 +1289,8 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             let html = `<table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-100 sticky-stat-label">${statLabels.statistic}</th>`;
             numericColumns.forEach(col => { 
-                html += `<th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${col}</th>`; 
+                // Sanitize column headers before inserting into the HTML string
+                html += `<th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${sanitizeHTML(col)}</th>`; 
             });
             html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
             statKeys.forEach(key => {
@@ -1472,9 +1522,9 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     createSelect('column-selector-color', labels.colorGroup, columns);
                     createRadioGroup('regression-type', labels.regressionLine, Object.entries(labels.regression));
                     break;
-                case 'pairplot':
-                    createSelect('column-selector-group', labels.colorGroup, columns);
-                    break;
+                //case 'pairplot':
+                //    createSelect('column-selector-group', labels.colorGroup, columns);
+                //    break;
                 case 'pareto':
                     // Container for category options
                     const paretoCatContainer = document.createElement('div');
@@ -1547,9 +1597,14 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             try {
                 // Map chart types to their respective drawing functions
                 const drawFunctions = {
-                    'histogram': drawBasicChart, 'box': drawBasicChart, 'bar': drawBasicChart, 
-                    'line': drawBasicChart, 'scatter': drawBasicChart, 'pairplot': drawPairPlot, 
-                    'pareto': drawParetoChart, 'xrs_control_chart': drawXRsaChart
+                    'histogram': drawBasicChart,
+                    'box': drawBasicChart,
+                    'bar': drawBasicChart, 
+                    'line': drawBasicChart,
+                    'scatter': drawBasicChart,
+                    //'pairplot': drawPairPlot, 
+                    'pareto': drawParetoChart,
+                    'xrs_control_chart': drawXRsaChart
                 };
                 
                 if (drawFunctions[chartType]) {
@@ -1562,7 +1617,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 console.error('Chart drawing error:', error);
                 chartContainer.innerHTML = `<div class="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center mt-4">
                     <p class="font-bold">${t.errorDrawingChart}</p>
-                    <p class="text-sm">${error.message || t.errorCheckSettings}</p>
+                    <p class="text-sm">${sanitizeHTML(error.message) || t.errorCheckSettings}</p>
                 </div>`;
                 downloadImageBtn.disabled = true; 
             } finally {
@@ -1612,7 +1667,8 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             }
             
             // --- Chart Title Generation ---
-            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            // Sanitize user-provided title to prevent XSS
+            const chartTitleInput = sanitizeHTML(document.getElementById('chart-title').value.trim());
 
             switch (type) {
                 case 'box':
@@ -1626,6 +1682,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     
                     if (activeDataCols.length === 0) throw new Error(t.errorBoxData);
 
+                    // Set sanitized title for the chart layout
                     layout.title = chartTitleInput || `${activeDataCols.join(', ')}${activeGroupCols.length > 0 ? ` by ${activeGroupCols.join(', ')}` : ''} ${t.chartTypes.box}`;
                     const groupingActive = activeGroupCols.length > 0;
 
@@ -1761,47 +1818,47 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
         /**
          * Draws a pair plot (scatter plot matrix).
          */
-        function drawPairPlot() {
-            const groupCol = document.getElementById('column-selector-group')?.value;
-            const numericColumns = columns.filter(c => rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c])));
-            
-            if (numericColumns.length < 2) {
-                throw new Error(translations[currentLang].errorPairPlot);
-            }
-
-            const dimensions = numericColumns.map(col => ({ 
-                label: col, 
-                values: rawData.map(d => d[col]) 
-            }));
-
-            const marker = { size: 4, opacity: 0.8 };
-            if (groupCol) {
-                // Create a mapping from unique group values to integers for coloring
-                const uniqueGroups = [...new Set(rawData.map(d => d[groupCol]))];
-                const colorMap = uniqueGroups.reduce((acc, val, i) => {
-                    acc[val] = i;
-                    return acc;
-                }, {});
-                marker.color = rawData.map(d => colorMap[d[groupCol]]);
-                // Add colorbar if you want a legend for the colors
-                // marker.colorbar = { title: groupCol };
-            }
-
-            const trace = { 
-                type: 'splom', 
-                dimensions, 
-                showlowerhalf: true, 
-                showupperhalf: false, 
-                marker, 
-                diagonal: { visible: false } 
-            };
-            
-            const chartTitleInput = document.getElementById('chart-title').value.trim();
-            const chartTitle = chartTitleInput || `${translations[currentLang].chartTypes.pairplot}${groupCol ? ` - Group: ${groupCol}` : ''}`;
-            
-            const layout = { title: chartTitle, height: 700, autosize: true, hovermode: 'closest' };
-            Plotly.newPlot(chartContainer, [trace], layout, { responsive: true });
-        }
+        //function drawPairPlot() {
+        //    const groupCol = document.getElementById('column-selector-group')?.value;
+        //    const numericColumns = columns.filter(c => rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c])));
+        //    
+        //    if (numericColumns.length < 2) {
+        //        throw new Error(translations[currentLang].errorPairPlot);
+        //    }
+        //
+        //    const dimensions = numericColumns.map(col => ({ 
+        //        label: col, 
+        //        values: rawData.map(d => d[col]) 
+        //    }));
+        //
+        //    const marker = { size: 4, opacity: 0.8 };
+        //    if (groupCol) {
+        //        // Create a mapping from unique group values to integers for coloring
+        //        const uniqueGroups = [...new Set(rawData.map(d => d[groupCol]))];
+        //        const colorMap = uniqueGroups.reduce((acc, val, i) => {
+        //            acc[val] = i;
+        //            return acc;
+        //        }, {});
+        //        marker.color = rawData.map(d => colorMap[d[groupCol]]);
+        //        // Add colorbar if you want a legend for the colors
+        //        // marker.colorbar = { title: groupCol };
+        //    }
+        //    
+        //    const trace = { 
+        //        type: 'splom', 
+        //        dimensions, 
+        //        showlowerhalf: true, 
+        //        showupperhalf: false, 
+        //        marker, 
+        //        diagonal: { visible: false } 
+        //    };
+        //    
+        //    const chartTitleInput = sanitizeHTML(document.getElementById('chart-title').value.trim());
+        //    const chartTitle = chartTitleInput || `${translations[currentLang].chartTypes.pairplot}${groupCol ? ` - Group: ${groupCol}` : ''}`;
+        //    
+        //    const layout = { title: chartTitle, height: 700, autosize: true, hovermode: 'closest' };
+        //    Plotly.newPlot(chartContainer, [trace], layout, { responsive: true });
+        //}
 
         /**
          * Draws a Pareto chart.
@@ -1875,7 +1932,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const line_x_indices = x_indices.map(i => i + 0.4);
             const lineTrace = { x: line_x_indices, y: ratios, type: 'scatter', mode: 'lines+markers', name: 'Cumulative %', yaxis: 'y2' };
             
-            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const chartTitleInput = sanitizeHTML(document.getElementById('chart-title').value.trim());
             const chartTitle = chartTitleInput || `${categoryCols.join(', ')} ${t.chartTypes.pareto}`;
             
             const layout = { 
@@ -1951,7 +2008,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 { x: indices, y: Array(values.length).fill(LCL_MR), mode: 'lines', name: 'LCL (Rs)', line: { dash: 'dash', color: 'red' }, yaxis: 'y2', xaxis: 'x2'}
             ];
 
-            const chartTitleInput = document.getElementById('chart-title').value.trim();
+            const chartTitleInput = sanitizeHTML(document.getElementById('chart-title').value.trim());
             const chartTitle = chartTitleInput || `${dataCol} ${t.chartTypes.xrs_control_chart}`;
             
             const layout = { 
