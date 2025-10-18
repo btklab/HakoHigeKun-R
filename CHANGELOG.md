@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-- NA
+- Update-Readme [README.md].
 
 ## [0.2.0] - 2025-10-18
 
-- Add-Feature [index.html] Implement strict Content Security Policy (CSP)
+- Add-Feature [index.html] Implement strict Content Security Policy (CSP).
 - Add-Feature [index.html] Implemented multiple column selection for box plots.
-- Refactor-Code [index.html] Extend category column selection to support multiple columns (previously single only)
+- Refactor-Code [index.html] Extend category column selection to support multiple columns (previously single only).
 - Add-Feature [index.html] Add sample data `allisonhorst/palmerpenguins`.
 - Add-Feature [index.html] Enable content refresh when clicking the title or pressing the refresh button.
 

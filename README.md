@@ -1,7 +1,9 @@
-# 📊 箱ひげくん-R (HakoHigeKun-R) - Instant Offline Box-and-Whisker Plotter
+# 📊 箱ひげくん-R (HakoHigeKun-R) - Your Personal Offline Box-and-Whisker Plotter
 
 **Drag & Drop → Instant Box Plot.**  
 **See your first numeric column as a box plot immediately—no clicks, no setup, no servers.**
+
+![HakoHigeKun-R's UI](img/img-ui.png)
 
 **HakoHigeKun-R** is an offline-first web app that lets QC engineers, data analysts, and students visualize their data instantly—no setup, no server, no cloud upload. Just drag a CSV or Excel file, and the first numeric column is automatically plotted as a Box-and-Whisker Plot.
 
@@ -10,7 +12,7 @@
 - **Hako**: Japanese for "箱（はこ）", also English "Box"  
 - **Hige**: Japanese for "髭（ひげ）", also English "Whisker"  
 - Together: **Box-and-Whisker Plot**.  
-- **-R**: It might stand for **"Regular"**, or maybe not. Who knows?  Makes it more interesting, doesn’t it? You can imagine many possible meanings over time - like what if it were **B**, **S**, **M**, **L**, **X**, or **Z** instead? Just have fun with it.
+- What Does the **R** Mean?: It might stand for **"Regular"**, or maybe not. Who knows?  Makes it more interesting, doesn’t it? You can imagine many possible meanings over time - like what if it were **B**, **S**, **M**, **L**, **X**, or **Z** instead? Just have fun with it.
 
 **What it can do**
 
@@ -19,11 +21,18 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 - **Pareto Chart**: Quickly spot the vital few factors.  
 - **X-Rs Control Chart**: Monitor process stability over time.
 
-![HakoHigeKun-R's UI](img/img-ui.png)
+## How to Use
+
+Using HakoHigeKun-R couldn't be simpler, as it runs entirely in your local browser environment.
+
+1. **Get the Code**: **Clone or download this repository** (or just ensure you have `index.html` and the `libs/` folder).
+2. **Open the App**: Simply **double-click `index.html`** to open the application in your default web browser.
+3. **Analyze Data**: Drag your CSV or Excel file directly into the application window. The box plot will appear instantly!
+4. **Explore More**: Optionally, use the sidebar to select different columns or chart types.
 
 ## Key Features
 
-- **Instant Visualization**: Drop a file and get a box plot from the first numeric column—no extra setup needed.
+- **Instant Visualization**: Drop a file and get a box plot from the first numeric column.
 - **Offline & Private**: Works completely in your browser. Your data never leaves your PC.
 - **Supports CSV & Excel**: Handles common file formats effortlessly.
 - **Interactive Charts**: Zoom, pan, hover, and explore your data with `Plotly.js`.
@@ -54,10 +63,7 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 
 🚧 Due to its focus on simplicity and offline operation, **HakoHigeKun-R** has some limitations regarding advanced features.
 
-1. **Single Grouping Column Only**
-    * For Box Plots and other charts that perform grouping, **only a single column can be designated as the grouping variable.**
-    * Complex multi-grouping (e.g., combining "Region" and "Gender" columns) is **not currently implemented.**
-2. **Large Datasets**
+1. **Large Datasets**
     * Since the application is dependent on browser memory, handling very large datasets (tens of thousands of rows or more) may result in reduced performance or potential loading failures.
 
 ## Project Structure
@@ -65,6 +71,7 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 ```bash
 .
 ├── index.html              # Main app
+├── index-unsafe.html       # Adding Pair Plot experimentally.
 ├── libs/                   # Libraries (Plotly.js, PapaParse, etc.)
 ├── LICENSE                 # MIT License
 ├── README.md               # This file
