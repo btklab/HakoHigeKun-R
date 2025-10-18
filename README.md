@@ -1,7 +1,7 @@
 # 📊 箱ひげくん-R (HakoHigeKun-R) - Your Personal Offline Box-and-Whisker Plotter
 
 **Drag & Drop → Instant Box Plot.**  
-**See your first numeric column as a box plot immediately—no clicks, no setup, no servers.**
+**See your first numeric column as a box plot immediately — no setup, no servers.**
 
 ![HakoHigeKun-R's UI](img/img-ui.png)
 
@@ -25,9 +25,9 @@ Beyond instant box plots, **HakoHigeKun-R** also provides simple statistical cha
 
 Using HakoHigeKun-R couldn't be simpler, as it runs entirely in your local browser environment.
 
-1. **Get the Code**: **Clone or download this repository** (or just ensure you have `index.html` and the `libs/` folder).
+1. **Get the Code**: **Clone or download this repository** (or just ensure you have `index.html` and the `libs/` directory).
 2. **Open the App**: Simply **double-click `index.html`** to open the application in your default web browser.
-3. **Analyze Data**: Drag your CSV or Excel file directly into the application window. The box plot will appear instantly!
+3. **Analyze Data**: Drag your CSV or Excel file directly into the application window. The box plot will appear instantly.
 4. **Explore More**: Optionally, use the sidebar to select different columns or chart types.
 
 ## Key Features
@@ -53,7 +53,7 @@ Using HakoHigeKun-R couldn't be simpler, as it runs entirely in your local brows
 
 ## How to Use
 
-1. **Download**: Clone or download this repository (or just `index.html` and `libs/` folder).
+1. **Download**: Clone or download this repository (or just `index.html` and `libs/` directory).
 2. **Open**: Open `index.html` in any modern browser.
 3. **Drag & Drop**: Drop your CSV or Excel file into the app.
 4. **Instant Box Plot**: The first numeric column is automatically selected and visualized.
