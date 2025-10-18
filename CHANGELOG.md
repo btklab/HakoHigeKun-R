@@ -7,20 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+- NA
+
+## [0.2.0] - 2025-10-18
+
+- Add-Feature [index.html] Implement strict Content Security Policy (CSP)
 - Add-Feature [index.html] Implemented multiple column selection for box plots.
 - Refactor-Code [index.html] Extend category column selection to support multiple columns (previously single only)
 - Add-Feature [index.html] Add sample data `allisonhorst/palmerpenguins`.
 - Add-Feature [index.html] Enable content refresh when clicking the title or pressing the refresh button.
 
-## [0.1.1] - 2025-10-12
+## [0.1.0] - 2025-10-12
 
 - Init
+
+
 
 [README.md]: blob/main/README.md
 [CHANGELOG.md]: blob/main/CHANGELOG.md
 [index.html]: blob/main/index.html
+[index-unsafe.html]: blob/main/index-unsafe.html
 
 
-[unreleased]: https://github.com/btklab/pwsh-sketches/compare/0.1.0..HEAD
+[unreleased]: https://github.com/btklab/pwsh-sketches/compare/0.2.0..HEAD
+[0.2.0]: https://github.com/btklab/pwsh-sketches/releases/tag/0.2.0
 [0.1.0]: https://github.com/btklab/pwsh-sketches/releases/tag/0.1.0
 
