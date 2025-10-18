@@ -17,7 +17,7 @@
     -->
     <meta http-equiv="Content-Security-Policy"
         content="default-src 'self';
-        script-src 'self' 'unsafe-inline' blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
         style-src 'self' 'unsafe-inline' blob:;
         worker-src 'self' blob:;
         img-src 'self' blob:;
@@ -311,7 +311,7 @@
                 errorMissingX: "Bar/Line charts require an X-axis or index selection.",
                 errorMissingY: "Y-axis data column not selected.",
                 errorBoxData: "Box plot requires a data column.",
-                //errorPairPlot: "Pair plot requires at least two numeric columns.",
+                errorPairPlot: "Pair plot requires at least two numeric columns.",
                 errorParetoCategory: "Category column is not selected.",
                 errorXRData: "X-Rs Control Chart requires at least two numeric data points.",
                 errorMRData: "Not enough data to calculate moving range.",
@@ -328,7 +328,7 @@
                     bar: "Bar Chart",
                     line: "Line Chart",
                     scatter: "Scatter Plot",
-                    //pairplot: "Pair Plot",
+                    pairplot: "Pair Plot",
                     pareto: "Pareto Chart",
                     xrs_control_chart: "X-Rs Control Chart"
                 },
@@ -395,7 +395,7 @@
                 errorMissingX: "棒グラフ、折れ線グラフにはX軸またはインデックスの選択が必要です。",
                 errorMissingY: "Y軸にデータ列が選択されていません。",
                 errorBoxData: "箱ひげ図にはデータ列が必要です。",
-                //errorPairPlot: "行列散布図を描画するには、2つ以上の数値列が必要です。",
+                errorPairPlot: "行列散布図を描画するには、2つ以上の数値列が必要です。",
                 errorParetoCategory: "カテゴリ列が選択されていません。",
                 errorXRData: "X-Rs管理図を描画するには、2つ以上の数値データが必要です。",
                 errorMRData: "移動範囲を計算できるデータがありません。",
@@ -407,12 +407,12 @@
                 loadingSampleData: "サンプルデータを読み込み中...",
                 errorLoadingSampleData: "サンプルデータの読み込みに失敗しました。詳細はコンソールを確認してください。",
                 chartTypes: {
-                    box: '箱ひげ図',
                     histogram: 'ヒストグラム',
+                    box: '箱ひげ図',
                     bar: '棒グラフ',
                     line: '折れ線グラフ',
                     scatter: '散布図',
-                    //pairplot: '行列散布図', 
+                    pairplot: '行列散布図', 
                     pareto: 'パレート図',
                     xrs_control_chart: 'X-Rs管理図',
                 },
@@ -528,7 +528,7 @@
             'bar': '棒グラフ',
             'line': '折れ線グラフ',
             'scatter': '散布図',
-            //'pairplot': '行列散布図', 
+            'pairplot': '行列散布図', 
             'pareto': 'パレート図',
             'xrs_control_chart': 'X-Rs管理図',
         };
@@ -1615,7 +1615,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     'bar': drawBasicChart, 
                     'line': drawBasicChart,
                     'scatter': drawBasicChart,
-                    //'pairplot': drawPairPlot, 
+                    'pairplot': drawPairPlot, 
                     'pareto': drawParetoChart,
                     'xrs_control_chart': drawXRsaChart
                 };
