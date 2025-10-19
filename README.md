@@ -1,4 +1,4 @@
-# 📊 箱ひげくん-R (HakoHigeKun-R) - Your Personal Offline Box-and-Whisker Plotter
+# 📊 箱ひげくん-R (HakoHigeKun-R) - Your Personal Offline Box-and-Whisker Plotter for Seeing What’s Hidden
 
 **Drag & Drop → Instant Box Plot.**  
 **See your first numeric column as a box plot immediately — no setup, no servers.**
