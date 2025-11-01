@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - NA
 
+## [0.2.2] - 2025-11-01
+
+- Update-Readme [README.md] Add an explanation of the box-and-whisker plot.
+
 ## [0.2.1] - 2025-10-18
 
 - Update-Readme [README.md].
