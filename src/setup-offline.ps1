@@ -12,10 +12,10 @@ if (-not (Test-Path $libDir)) {
 
 # List of files to download
 $files = @(
-    @{ Url = "https://cdn.tailwindcss.com";                               Out = "tailwindcss.js" },
-    @{ Url = "https://cdn.plot.ly/plotly-2.32.0.min.js";                  Out = "plotly-2.32.0.min.js" },
+    @{ Url = "https://cdn.tailwindcss.com"; Out = "tailwindcss.js" },
+    @{ Url = "https://cdn.plot.ly/plotly-2.32.0.min.js"; Out = "plotly-2.32.0.min.js" },
     @{ Url = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"; Out = "papaparse.min.js" },
-    @{ Url = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";        Out = "xlsx.full.min.js" }
+    @{ Url = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"; Out = "xlsx.full.min.js" }
 )
 
 # Download each file into the "libs" folder
