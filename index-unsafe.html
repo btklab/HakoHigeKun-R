@@ -1,7 +1,13 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="scroll-smooth"> <!-- Added scroll-smooth for better anchor/jump scrolling -->
 <head>
     <meta charset="UTF-8">
+    <!-- 
+        Viewport Meta Tag: Essential for Responsive Design
+        'width=device-width' sets the width of the page to follow the screen-width of the device.
+        'initial-scale=1.0' sets the initial zoom level when the page is first loaded.
+        This ensures the layout renders correctly on mobile devices.
+    -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!--
         Content Security Policy (CSP)
@@ -63,7 +69,13 @@
     <script src="libs/papaparse.min.js"></script>
     <script src="libs/xlsx.full.min.js"></script>
     <style>
-        /* Custom Styles: Adjust sidebar width and main content */
+        /* Readable Code Comment: 
+           The fixed-width styles below were commented out to implement a responsive layout.
+           Fixed widths (e.g., 'width: 320px') break layouts on small screens.
+           These styles have been replaced with Tailwind CSS utility classes (e.g., 'w-full', 'lg:w-[320px]')
+           directly on the HTML elements for better co-location and responsiveness.
+        */
+        /*
         .sidebar {
             width: 320px;
             min-width: 320px;
@@ -71,10 +83,18 @@
         .main-content {
             flex-grow: 1;
         }
+        */
+
         /* Set height for the Plotly chart container */
         #chart-container {
-            min-height: 600px;
+            min-height: 400px; /* Reduced min-height for mobile friendliness */
         }
+        @media (min-width: 768px) { /* md: */
+            #chart-container {
+                min-height: 600px; /* Restore original min-height on larger screens */
+            }
+        }
+
         /* Style the scrollbar for better visibility */
         ::-webkit-scrollbar {
             width: 8px;
@@ -107,6 +127,10 @@
         /* === Print Styles === */
         /* ======================================= */
         @media print {
+            /* Readable Code Comment: (Print Styles)
+               These styles hide non-essential UI elements (like the sidebar and buttons)
+               and expand the main content and chart to fill the page for a clean printout.
+            */
             .sidebar, header, button, .hidden-print, .language-switcher { display: none !important; }
             .main-container { display: block !important; }
             .main-content, #chart-area { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
@@ -116,15 +140,35 @@
         }
 </style>
 </head>
-<body class="bg-gray-50 flex h-screen overflow-hidden text-gray-800 font-sans">
+<!--
+    Responsive Layout Strategy:
+    - Default (Mobile): 'flex-col' stacks the sidebar and main content vertically.
+    - Large Screens (lg:): 'flex-row' places them side-by-side.
+    - 'lg:h-screen' and 'lg:overflow-hidden' contain the layout to the viewport on desktop,
+      preventing the whole page from scrolling, allowing individual panels to scroll instead.
+-->
+<body class="bg-gray-100 flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-gray-800 font-sans">
 
-    <div class="sidebar bg-white p-6 shadow-xl overflow-y-auto">
+    <!--
+        Sidebar Layout:
+        - Default (Mobile): 'w-full' takes up the full screen width.
+        - Large Screens (lg:): 'w-[320px]' sets the fixed width for the desktop layout.
+        - 'lg:flex-shrink-0' prevents the sidebar from shrinking if the content area grows.
+        - 'lg:overflow-y-auto' enables scrolling *only* for the sidebar on large screens.
+    -->
+    <div class="bg-white p-6 w-full lg:w-[320px] lg:flex-shrink-0 lg:shadow-xl lg:overflow-y-auto">
         <h1 class="text-3xl font-extrabold text-blue-700 mb-2 border-b pb-2">
             <span data-lang-key="appTitle" onclick="location.reload()" style="cursor: pointer;" data-lang-key-title="refreshTitle">📊 箱ひげくん-R</span>
         </h1>
 
-        <div class="language-switcher flex justify-end items-center mb-4">
-            <button onclick="location.reload()" class="text-xs py-1 px-3 rounded-md border border-gray-300 bg-gray-50 hover:bg-gray-100 mr-2" data-lang-key="refreshButton" data-lang-key-title="refreshTitle">Refresh</button>
+        <!--
+            Responsive Controls:
+            - 'flex-wrap' allows buttons to wrap to the next line on very narrow screens.
+            - 'justify-between' puts space between the Refresh and Language buttons.
+            - 'gap-2' adds spacing between items when they wrap.
+        -->
+        <div class="language-switcher flex flex-wrap justify-between items-center mb-4 gap-2">
+            <button onclick="location.reload()" class="text-xs py-1 px-3 rounded-md border border-gray-300 bg-gray-50 hover:bg-gray-100" data-lang-key="refreshButton" data-lang-key-title="refreshTitle">Refresh</button>
             <div>
                 <button onclick="setLanguage('ja')" class="lang-btn text-xs py-1 px-3 rounded-l-lg border border-gray-300" data-lang="ja">日本語</button>
                 <button onclick="setLanguage('en')" class="lang-btn text-xs py-1 px-3 rounded-r-lg border-t border-b border-r border-gray-300" data-lang="en">English</button>
@@ -210,12 +254,23 @@
         </footer>
     </div>
 
-    <div class="main-content flex flex-col p-8 overflow-y-auto">
+    <!--
+        Main Content Layout:
+        - 'flex-grow': Ensures this container takes up all available space
+          (both vertically on mobile and horizontally on desktop).
+        - 'overflow-y-auto': This is the *main* scrolling area for the application content.
+        - 'p-4 md:p-8': Responsive padding. 'p-4' (1rem) on mobile, 'p-8' (2rem) on medium screens and up.
+    -->
+    <div class="main-content flex flex-col p-4 md:p-8 overflow-y-auto flex-grow">
         
-        <div id="chart-area" class="flex-grow bg-white p-6 rounded-xl shadow-lg mb-8">
+        <!--
+            Card Layout:
+            - 'p-4 md:p-6': Responsive padding. 'p-4' (1rem) on mobile, 'p-6' (1.5rem) on medium screens and up.
+        -->
+        <div id="chart-area" class="flex-grow bg-white p-4 md:p-6 rounded-xl shadow-lg mb-8">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-gray-700" data-lang-key="chartDisplayTitle">📈 グラフ表示</h2>
-                <button onclick="downloadChartAsImage()" id="download-image-btn" class="py-2 px-4 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 transform disabled:bg-gray-400" disabled>
+                <button onclick="downloadChartAsImage()" id="download-image-btn" class="py-2 px-4 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 transform disabled:bg-gray-400">
                     <span data-lang-key="downloadImageButton">画像ダウンロード (PNG)</span>
                 </button>
             </div>
@@ -224,7 +279,8 @@
             </div>
         </div>
 
-        <div id="data-preview-section" class="mb-8 hidden bg-white p-6 rounded-xl shadow-lg">
+        <!-- Card Layout: 'p-4 md:p-6' for responsive padding -->
+        <div id="data-preview-section" class="mb-8 hidden bg-white p-4 md:p-6 rounded-xl shadow-lg">
             <h2 class="text-2xl font-bold mb-4 text-gray-700" data-lang-key="dataPreviewTitle">📄 データプレビュー</h2>
             <div class="overflow-x-auto max-h-60">
                 <table id="data-preview-table" class="min-w-full divide-y divide-gray-200">
@@ -234,7 +290,8 @@
             </div>
         </div>
 
-        <div id="summary-statistics-section" class="mb-8 hidden bg-white p-6 rounded-xl shadow-lg">
+        <!-- Card Layout: 'p-4 md:p-6' for responsive padding -->
+        <div id="summary-statistics-section" class="mb-8 hidden bg-white p-4 md:p-6 rounded-xl shadow-lg">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-gray-700" data-lang-key="summaryStatsTitle">🔢 要約統計量 (数値列のみ)</h2>
                 <button onclick="downloadSummaryStatistics()" id="download-summary-btn" class="py-2 px-4 bg-green-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 transform disabled:bg-gray-400" disabled>
@@ -407,8 +464,8 @@
                 loadingSampleData: "サンプルデータを読み込み中...",
                 errorLoadingSampleData: "サンプルデータの読み込みに失敗しました。詳細はコンソールを確認してください。",
                 chartTypes: {
-                    histogram: 'ヒストグラム',
                     box: '箱ひげ図',
+                    histogram: 'ヒストグラム',
                     bar: '棒グラフ',
                     line: '折れ線グラフ',
                     scatter: '散布図',
@@ -427,7 +484,7 @@
                     nBins: "ビンの数 (N_bins)",
                     yAxisMulti: "Y軸 (値) - 複数選択可能",
                     xAxisLabel: "X軸 (ラベル)",
-                    yAxisValue: "Y軸 (値)",
+                    yAxisValue: "Y-axis (Value)",
                     regressionLine: "回帰線 (オプション)",
                     regression: { none: "なし", linear: "線形", poly: "多項式 (2次)" },
                     paretoCategory: "カテゴリ列",
