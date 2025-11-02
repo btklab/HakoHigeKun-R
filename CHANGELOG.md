@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - NA
 
+## [0.2.3] - 2025-11-02
+
+- Apply-Feature [index.html] Add responsive design.
+
 ## [0.2.2] - 2025-11-01
 
 - Update-Readme [README.md] Add an explanation of the box-and-whisker plot.
@@ -37,7 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [index-unsafe.html]: blob/main/index-unsafe.html
 
 
-[unreleased]: https://github.com/btklab/pwsh-sketches/compare/0.2.1..HEAD
+[unreleased]: https://github.com/btklab/pwsh-sketches/compare/0.2.3..HEAD
+[0.2.3]: https://github.com/btklab/pwsh-sketches/releases/tag/0.2.3
+[0.2.2]: https://github.com/btklab/pwsh-sketches/releases/tag/0.2.2
 [0.2.1]: https://github.com/btklab/pwsh-sketches/releases/tag/0.2.1
 [0.2.0]: https://github.com/btklab/pwsh-sketches/releases/tag/0.2.0
 [0.1.0]: https://github.com/btklab/pwsh-sketches/releases/tag/0.1.0
