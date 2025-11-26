@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-- NA
+- Add-Feature [index.html] Add new grid: Histogram (All Numeric)"
 
 ## [0.2.3] - 2025-11-02
 

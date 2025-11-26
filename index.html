@@ -382,6 +382,7 @@
                 chartTypes: {
                     box: "Box Plot",
                     histogram: "Histogram",
+                    histogram_all: "Histogram (All Numeric)",
                     bar: "Bar Chart",
                     line: "Line Chart",
                     scatter: "Scatter Plot",
@@ -466,6 +467,7 @@
                 chartTypes: {
                     box: '箱ひげ図',
                     histogram: 'ヒストグラム',
+                    histogram_all: 'ヒストグラム (全数値列)',
                     bar: '棒グラフ',
                     line: '折れ線グラフ',
                     scatter: '散布図',
@@ -582,6 +584,7 @@
         const CHART_TYPES = {
             'box': '箱ひげ図',
             'histogram': 'ヒストグラム',
+            'histogram_all': 'ヒストグラム (全数値列)',
             'bar': '棒グラフ',
             'line': '折れ線グラフ',
             'scatter': '散布図',
@@ -1218,7 +1221,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     }
                 }
 
-                // If more than half of the sample size are numeric, consider it a numeric column
+                // If more than half of the sample size are numeric, treat it as a numeric column
                 if (numericCount > sampleSize / 2) {
                     return col;
                 }
@@ -1508,6 +1511,9 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     createSelect('column-selector-color', labels.colorGroup, columns); 
                     createInput('histogram-n-bins', labels.nBins, 'number', 10);
                     break;
+                case 'histogram_all':
+                    createInput('histogram-n-bins', labels.nBins, 'number', 10);
+                    break;
                 case 'box':
                     // --- Container for Y-axis Data Column(s) ---
                     const dataContainer = document.createElement('div');
@@ -1668,6 +1674,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 // Map chart types to their respective drawing functions
                 const drawFunctions = {
                     'histogram': drawBasicChart,
+                    'histogram_all': drawAllHistograms,
                     'box': drawBasicChart,
                     'bar': drawBasicChart, 
                     'line': drawBasicChart,
@@ -1881,6 +1888,70 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     }
                     break;
             }
+
+            Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
+        }
+
+        /**
+         * Draws histograms for all numeric columns in a grid layout.
+         */
+        function drawAllHistograms() {
+            const t = translations[currentLang];
+            
+            // Identify all numeric columns
+            const numericColumns = columns.filter(c => 
+                rawData.some(r => typeof r[c] === 'number' && !isNaN(r[c]))
+            );
+
+            if (numericColumns.length === 0) throw new Error(t.noNumericData);
+
+            const nBins = parseInt(document.getElementById('histogram-n-bins')?.value) || 10;
+            
+            // Determine grid dimensions
+            const totalPlots = numericColumns.length;
+            const colsPerRow = totalPlots < 3 ? totalPlots : 3;
+            const rows = Math.ceil(totalPlots / colsPerRow);
+
+            // Create traces with axis mapping for subplots
+            const traces = numericColumns.map((col, i) => ({
+                x: rawData.map(d => d[col]),
+                type: 'histogram',
+                nbinsx: nBins,
+                name: col,
+                xaxis: 'x' + (i + 1),
+                yaxis: 'y' + (i + 1)
+            }));
+
+            const chartTitleInput = sanitizeHTML(document.getElementById('chart-title').value.trim());
+            const chartTitle = chartTitleInput || t.chartTypes.histogram_all;
+
+            // Setup layout with independent grid
+            const layout = {
+                title: chartTitle,
+                height: Math.max(600, 300 * rows), // Dynamic height based on rows, min 600px
+                grid: {
+                    rows: rows,
+                    columns: colsPerRow,
+                    pattern: 'independent'
+                },
+                showlegend: false,
+                margin: { t: 50, b: 50, l: 50, r: 30 }
+            };
+            
+            // Add axis titles for each subplot
+            numericColumns.forEach((col, i) => {
+                const axisKeyX = 'xaxis' + (i === 0 ? '' : (i + 1));
+                const axisKeyY = 'yaxis' + (i === 0 ? '' : (i + 1));
+                
+                // Initialize axis objects if they don't exist
+                if (!layout[axisKeyX]) layout[axisKeyX] = {};
+                if (!layout[axisKeyY]) layout[axisKeyY] = {};
+                
+                layout[axisKeyX].title = col;
+                layout[axisKeyX].automargin = true;
+                layout[axisKeyY].title = 'Freq';
+                layout[axisKeyY].automargin = true;
+            });
 
             Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
         }
