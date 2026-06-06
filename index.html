@@ -410,7 +410,9 @@
                     paretoValueOption: "(Count by rows)",
                     paretoTopN: "Show Top N Items",
                     paretoExcludeOther: 'Exclude "Other"',
-                    xrsData: "Data Column"
+                    xrsData: "Data Column",
+                    yAxisScale: "Y-axis Scale",
+                    yAxisScaleOptions: { linear: "Linear", log: "Logarithmic" }
                 },
                 statLabels: {
                     statistic: "Statistic",
@@ -495,7 +497,9 @@
                     paretoValueOption: "(行数で集計)",
                     paretoTopN: "上位N件表示",
                     paretoExcludeOther: "「その他」を除外する",
-                    xrsData: "データ列"
+                    xrsData: "データ列",
+                    yAxisScale: "縦軸のスケール",
+                    yAxisScaleOptions: { linear: "線形", log: "対数" }
                 },
                 statLabels: {
                     statistic: "統計量",
@@ -1653,7 +1657,11 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     break;
                 default: 
                     chartConfigArea.innerHTML = `<p class="text-red-500">${t.errorNotImplemented}</p>`;
+                    return; // Return early if rendering is not possible to avoid displaying common UI
             }
+
+            //--- Add common settings ---
+            createRadioGroup('yaxis-scale', labels.yAxisScale, Object.entries(labels.yAxisScaleOptions));
         }
 
         // ===================================================================================
@@ -1720,21 +1728,23 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
         function drawBasicChart(type) {
             const t = translations[currentLang];
             let traces = [];
-            const layout = { 
-                margin: { t: 50, b: 40, l: 50, r: 20 }, 
-                height: 550, 
-                hovermode: 'closest',
-                xaxis: { automargin: true },
-                yaxis: { automargin: true }
-            };
 
             // Get values from UI controls
             const xCol = document.getElementById('column-selector-x')?.value;
             const yCols = getSelectedValues('column-selector-y');
             const colorCol = document.getElementById('column-selector-color')?.value;
             const regressionType = document.querySelector('input[name="regression-type"]:checked')?.value || 'none';
+            const yAxisScale = document.querySelector('input[name="yaxis-scale"]:checked')?.value || 'linear';
             const firstYCol = yCols[0] || '';
             const xIsIndex = (type === 'bar' || type === 'line') && xCol === t.indexOption;
+
+            const layout = { 
+                margin: { t: 50, b: 40, l: 50, r: 20 }, 
+                height: 550, 
+                hovermode: 'closest',
+                xaxis: { automargin: true },
+                yaxis: { automargin: true, type: yAxisScale === 'log' ? 'log' : 'linear' }
+            };
             
             // --- Input Validation for non-box charts ---
             if (type !== 'box') {
@@ -1853,20 +1863,28 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                         layout.yaxis.title = 'Frequency';
                     } else { // scatter
                         layout.showlegend = !!colorCol;
+
+                        // layout.xaxis.type = document.getElementById('xaxis-log')?.checked ? 'log' : 'linear';
+
                         layout.xaxis.title = xCol;
                         layout.yaxis.title = firstYCol;
                         if (regressionType === 'linear') {
                             const validPoints = rawData.filter(d => typeof d[xCol] === 'number' && typeof d[firstYCol] === 'number');
                             const xVals = validPoints.map(d => d[xCol]);
                             const yVals = validPoints.map(d => d[firstYCol]);
+                            
                             if (xVals.length > 1) {
-                                const n = xVals.length;
-                                const sumX = xVals.reduce((a, b) => a + b, 0), sumY = yVals.reduce((a, b) => a + b, 0);
-                                const sumXY = xVals.reduce((s, x, i) => s + x * yVals[i], 0), sumXX = xVals.reduce((s, x) => s + x * x, 0);
-                                const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-                                const a = (sumY / n) - b * (sumX / n);
-                                const xMin = Math.min(...xVals), xMax = Math.max(...xVals);
-                                traces.push({ x: [xMin, xMax], y: [a + b * xMin, a + b * xMax], mode: 'lines', type: 'scatter', line: { color: 'red' }, name: t.configLabels.regression.linear });
+                                const isLog = (layout.yaxis && layout.yaxis.type === 'log');
+                                const line = calculateRegressionLine(xVals, yVals, isLog);
+                                
+                                traces.push({ 
+                                    x: line.x, 
+                                    y: line.y, 
+                                    mode: 'lines', 
+                                    type: 'scatter', 
+                                    line: { color: 'red' }, 
+                                    name: t.configLabels.regression.linear 
+                                });
                             }
                         }
                     }
@@ -1906,6 +1924,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             if (numericColumns.length === 0) throw new Error(t.noNumericData);
 
             const nBins = parseInt(document.getElementById('histogram-n-bins')?.value) || 10;
+            const yAxisScale = document.querySelector('input[name="yaxis-scale"]:checked')?.value || 'linear';
             
             // Determine grid dimensions
             const totalPlots = numericColumns.length;
@@ -1951,6 +1970,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 layout[axisKeyX].automargin = true;
                 layout[axisKeyY].title = 'Freq';
                 layout[axisKeyY].automargin = true;
+                layout[axisKeyY].type = yAxisScale === 'log' ? 'log' : 'linear';
             });
 
             Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
@@ -2014,6 +2034,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
             const valueColRaw = document.getElementById('pareto-value-col').value;
             const topN = parseInt(document.getElementById('pareto-top-n').value) || 10;
             const excludeOther = document.getElementById('pareto-exclude-other').checked;
+            const yAxisScale = document.querySelector('input[name="yaxis-scale"]:checked')?.value || 'linear';
             const t = translations[currentLang];
             
             if (categoryCols.length === 0) throw new Error(t.errorParetoCategory);
@@ -2086,7 +2107,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                     // Adjust range to ensure the last marker (at n-1 + 0.4) is visible.
                     range: [-0.75, x_indices.length - 0.5]
                 },
-                yaxis: { title: 'Value' },
+                yaxis: { title: 'Value', type: yAxisScale === 'log' ? 'log' : 'linear' },
                 // Increase range slightly to prevent 100% marker from touching the top border
                 yaxis2: { title: 'Cumulative Ratio (%)', overlaying: 'y', side: 'right', range: [0, 105] },
                 // Add a horizontal line at 80% for Pareto analysis
@@ -2113,6 +2134,7 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
          */
         function drawXRsaChart() {
             const dataCol = document.getElementById('xrs-data-col').value;
+            const yAxisScale = document.querySelector('input[name="yaxis-scale"]:checked')?.value || 'linear';
             const t = translations[currentLang];
             if (!dataCol) throw new Error(t.errorMissingData);
 
@@ -2156,8 +2178,8 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
                 title: chartTitle, 
                 height: 800, 
                 grid: { rows: 2, columns: 1, pattern: 'independent' },
-                yaxis: { title: 'X (Value)' }, 
-                yaxis2: { title: 'Rs (Moving Range)' }, 
+                yaxis: { title: 'X (Value)', type: yAxisScale === 'log' ? 'log' : 'linear' }, 
+                yaxis2: { title: 'Rs (Moving Range)', type: yAxisScale === 'log' ? 'log' : 'linear' }, 
                 showlegend: false 
             };
 
@@ -2207,6 +2229,40 @@ Chinstrap,Dream,50.2,18.8,202,3800,male,2009
         // Application Startup
         // ===================================================================================
         initializeApp();
+
+        /**
+         * @param {Array} xValues - Data of X axis
+         * @param {Array} yValues - Data of Y axis
+         * @param {boolean} isLogScale - is LogScale ON?
+         */
+        function calculateRegressionLine(xValues, yValues, isLogScale) {
+            let x = xValues;
+            let y = isLogScale ? yValues.map(v => Math.log10(v)) : yValues;
+            
+            // y = mx + b
+            const n = x.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+            for (let i = 0; i < n; i++) {
+                sumX += x[i];
+                sumY += y[i];
+                sumXY += x[i] * y[i];
+                sumXX += x[i] * x[i];
+            }
+            
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            
+            const xMin = Math.min(...x);
+            const xMax = Math.max(...x);
+            const lineX = [xMin, xMax];
+            const lineY = lineX.map(xv => {
+                const val = slope * xv + intercept;
+                return isLogScale ? Math.pow(10, val) : val;
+            });
+
+            return { x: lineX, y: lineY };
+        }
     </script>
 </body>
 </html>
