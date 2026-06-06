@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
-- Add-Feature [index.html] Add new grid: Histogram (All Numeric)"
+## [0.3.0] - 2026-06-06
+
+- Add-Feature [index.html] Add support for Y-axis logarithmic scale in scatter plots
+- Add-Feature [index.html] Add new grid: Histogram (All Numeric)
 
 ## [0.2.3] - 2025-11-02
 
